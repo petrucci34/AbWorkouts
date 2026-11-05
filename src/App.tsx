@@ -20,6 +20,12 @@ type NavState =
   | { name: 'favorites'; depth: number }
   | { name: 'workout'; depth: number; plan: WorkoutPlan }
 
+type NavInput =
+  | { name: 'home' }
+  | { name: 'settings' }
+  | { name: 'favorites' }
+  | { name: 'workout'; plan: WorkoutPlan }
+
 function isNavState(value: unknown): value is NavState {
   if (!value || typeof value !== 'object') return false
   const name = (value as { name?: unknown }).name
@@ -62,9 +68,9 @@ export function App() {
     setRoute(routeFrom(state))
   }
 
-  function push(next: Omit<NavState, 'depth'>) {
+  function push(next: NavInput) {
     const depth = (isNavState(history.state) ? history.state.depth : 0) + 1
-    const state = { ...next, depth } as NavState
+    const state: NavState = { ...next, depth }
     history.pushState(state, '')
     show(state)
   }

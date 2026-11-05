@@ -1,3 +1,4 @@
+import { assetUrl } from '../data/media'
 import { categories, categoryInfo, type Category, type WorkoutSettings } from '../data/types'
 import { REST_SECONDS } from '../lib/engine'
 import { SlidersIcon, StarIcon } from '../components/Icons'
@@ -5,10 +6,10 @@ import { StillFrame } from '../components/StillFrame'
 import { TopBar } from '../components/TopBar'
 
 const categoryImage: Record<Category, string> = {
-  upper: '/exercises/crunch.gif',
-  lower: '/exercises/lying-leg-raise.gif',
-  obliques: '/exercises/bicycle-crunch.gif',
-  fullCore: '/exercises/forearm-plank.gif',
+  upper: assetUrl('exercises/crunch.gif'),
+  lower: assetUrl('exercises/lying-leg-raise.gif'),
+  obliques: assetUrl('exercises/bicycle-crunch.gif'),
+  fullCore: assetUrl('exercises/forearm-plank.gif'),
 }
 
 export function HomeScreen({

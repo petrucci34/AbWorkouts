@@ -12,6 +12,8 @@ npm run dev
 
 Then open the local URL Vite prints. `npm run build` writes a static site to `dist/`.
 
+The live site is [petrucci34.github.io/AbWorkouts](https://petrucci34.github.io/AbWorkouts/). Pushes to this branch publish it through GitHub Pages.
+
 ## What’s included
 
 - **Home** — four category tiles (Upper, Lower, Obliques, Full core). A tap starts a session with the last Settings timing.

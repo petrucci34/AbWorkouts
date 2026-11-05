@@ -199,32 +199,60 @@ await page.waitForFunction(() => {
   const img = document.querySelector('.demo-image')
   return img instanceof HTMLImageElement && img.naturalWidth > 0 && (img.getAttribute('src') ?? '').includes('bird-dog')
 })
-const birdDogFit = await page.evaluate(() => {
-  const img = document.querySelector('.demo-image')
-  const frame = document.querySelector('.gif-frame')
-  if (!(img instanceof HTMLImageElement) || !(frame instanceof HTMLElement)) return null
-  const imageBox = img.getBoundingClientRect()
-  const frameBox = frame.getBoundingClientRect()
-  const shown = imageBox.width / imageBox.height
-  const natural = img.naturalWidth / img.naturalHeight
-  return {
-    inside:
-      imageBox.top >= frameBox.top - 1 &&
-      imageBox.bottom <= frameBox.bottom + 1 &&
-      imageBox.left >= frameBox.left - 1 &&
-      imageBox.right <= frameBox.right + 1,
-    aspectDelta: Math.abs(shown - natural),
-    image: { w: imageBox.width, h: imageBox.height },
-    frame: { w: frameBox.width, h: frameBox.height },
-    natural: { w: img.naturalWidth, h: img.naturalHeight },
-  }
-})
+async function demoFit() {
+  return page.evaluate(() => {
+    const img = document.querySelector('.demo-image')
+    const frame = document.querySelector('.gif-frame')
+    if (!(img instanceof HTMLImageElement) || !(frame instanceof HTMLElement) || img.naturalWidth === 0) return null
+    const imageBox = img.getBoundingClientRect()
+    const frameBox = frame.getBoundingClientRect()
+    const natural = img.naturalWidth / img.naturalHeight
+    const frameAspect = frameBox.width / frameBox.height
+    const contentW = natural > frameAspect ? frameBox.width : frameBox.height * natural
+    const contentH = natural > frameAspect ? frameBox.width / natural : frameBox.height
+    return {
+      objectFit: getComputedStyle(img).objectFit,
+      fillsFrame: imageBox.width >= frameBox.width - 2 && imageBox.height >= frameBox.height - 2,
+      fits: contentW <= frameBox.width + 1 && contentH <= frameBox.height + 1,
+      largest: Math.max(contentW / frameBox.width, contentH / frameBox.height),
+      contentW,
+      contentH,
+      frameW: frameBox.width,
+      frameH: frameBox.height,
+    }
+  })
+}
+
+const birdDogFit = await demoFit()
 check(
   'bird dog fully visible',
-  Boolean(birdDogFit?.inside) && (birdDogFit?.aspectDelta ?? 1) < 0.08,
+  Boolean(birdDogFit?.fillsFrame) &&
+    birdDogFit?.objectFit === 'contain' &&
+    birdDogFit?.fits &&
+    (birdDogFit?.largest ?? 0) > 0.97,
   JSON.stringify(birdDogFit),
 )
 await page.screenshot({ path: `${shots}/08-bird-dog.png` })
+
+for (const title of ['Jackknife', 'V-sit hold', 'Bear crawl', 'Push-up to side plank']) {
+  for (let step = 0; step < 8; step += 1) {
+    const current = await page.$eval('.workout-copy h2', (el) => el.textContent ?? '')
+    if (current === title) break
+    await clickText('Skip')
+  }
+  await page.waitForFunction((name) => {
+    const img = document.querySelector('.demo-image')
+    return document.querySelector('.workout-copy h2')?.textContent === name && img instanceof HTMLImageElement && img.naturalWidth > 0
+  }, {}, title)
+  const fit = await demoFit()
+  const slug = title.toLowerCase().replace(/[^a-z]+/g, '-')
+  check(
+    `${title} fills the card`,
+    Boolean(fit?.fillsFrame) && fit?.objectFit === 'contain' && fit?.fits && Math.min(fit?.contentW ?? 0, fit?.contentH ?? 0) >= 240,
+    JSON.stringify(fit),
+  )
+  await page.screenshot({ path: `${shots}/10-${slug}.png` })
+}
 
 await clickText('End')
 await page.waitForSelector('.tile')

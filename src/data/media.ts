@@ -39,6 +39,11 @@ export function hasGif(exerciseId: string): boolean {
   return wiredIds.has(exerciseId)
 }
 
+export function assetUrl(file: string): string {
+  const base = import.meta.env.BASE_URL || '/'
+  return `${base}${file.replace(/^\//, '')}`
+}
+
 export function gifUrl(exerciseId: string): string | null {
-  return hasGif(exerciseId) ? `/exercises/${exerciseId}.gif` : null
+  return hasGif(exerciseId) ? assetUrl(`exercises/${exerciseId}.gif`) : null
 }
