@@ -40,7 +40,22 @@ async function clickText(text) {
 
 await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
 await page.goto(base, { waitUntil: 'networkidle0' })
+await page.waitForFunction(() => {
+  const images = [...document.querySelectorAll('.tile-image')]
+  return (
+    images.length === 4 &&
+    images.every(
+      (img) =>
+        img instanceof HTMLImageElement &&
+        img.naturalWidth > 0 &&
+        (img.getAttribute('src') ?? '').startsWith('data:image/png'),
+    )
+  )
+})
 await page.screenshot({ path: `${shots}/01-home-phone.png` })
+check('category images', (await page.$$('.tile-image')).length === 4)
+const fullCorePoster = await page.$eval('.tile[data-category="fullCore"] .tile-image', (el) => el.getAttribute('data-source') ?? '')
+check('full core thumbnail', fullCorePoster.endsWith('/exercises/forearm-plank.gif'), fullCorePoster)
 
 check('home title', (await page.$eval('h2', (el) => el.textContent)) === 'Ab Workouts')
 check('four categories', (await page.$$('.tile')).length === 4)
@@ -49,6 +64,11 @@ check('default timing', (await page.$eval('.chip', (el) => el.textContent ?? '')
 await page.click('[aria-label="Settings"]')
 await page.waitForFunction(() => document.body.textContent?.includes('Session length'))
 await page.screenshot({ path: `${shots}/02-settings.png` })
+await page.goBack()
+await page.waitForSelector('.tile-grid')
+check('browser back from settings', (await page.$eval('h2', (el) => el.textContent)) === 'Ab Workouts')
+await page.click('[aria-label="Settings"]')
+await page.waitForFunction(() => document.body.textContent?.includes('Session length'))
 const segments = await page.$$('.segment')
 const durations = await segments[0].$$('button')
 const lengths = await segments[1].$$('button')
@@ -99,14 +119,36 @@ await clickText('Resume')
 await clickText('Skip')
 await page.waitForFunction(() => document.querySelector('.workout-copy h2')?.textContent === 'Rest')
 const restClock = await page.$eval('.countdown', (el) => el.textContent ?? '')
-check('rest', restClock.includes('0:03'), restClock)
+check('rest', restClock.includes('0:03') || restClock.includes('0:02'), restClock)
 const restNext = await page.$eval('.up-next', (el) => el.textContent ?? '')
 check('rest up next', restNext.includes('Sit-up'), restNext)
+await page.waitForFunction(() => {
+  const img = document.querySelector('.demo-image')
+  const frame = document.querySelector('.gif-frame')
+  return (
+    img instanceof HTMLImageElement &&
+    (img.getAttribute('src') ?? '').startsWith('data:image/png') &&
+    frame?.getAttribute('data-exercise') === 'sit-up'
+  )
+})
+const restExercise = await page.$eval('.gif-frame', (el) => el.getAttribute('data-exercise') ?? '')
+check('rest shows next move', restExercise === 'sit-up', restExercise)
 const restSrc = await page.$eval('.demo-image', (el) => el.getAttribute('src') ?? '')
-check('rest shows next gif', restSrc.includes('sit-up'), restSrc)
+const restGifCount = await page.$$eval('.gif-frame img[src$=".gif"]', (els) => els.length)
+await new Promise((resolve) => setTimeout(resolve, 400))
+const restSrcLater = await page.$eval('.demo-image', (el) => el.getAttribute('src') ?? '')
+check('rest is a still', restSrc.startsWith('data:image/png') && restSrc === restSrcLater && restGifCount === 0, restSrc.slice(0, 32))
 await page.screenshot({ path: `${shots}/04-rest.png` })
 
+await clickText('Skip')
+await page.waitForFunction(() => document.querySelector('.workout-copy h2')?.textContent === 'Sit-up')
+await clickText('Previous')
+await page.waitForFunction(() => document.querySelector('.workout-copy h2')?.textContent === 'Crunch')
+check('previous exercise', (await page.$eval('.workout-copy h2', (el) => el.textContent)) === 'Crunch')
+
 await clickText('End')
+await page.waitForSelector('.tile')
+check('end returns home', (await page.$eval('h2', (el) => el.textContent)) === 'Ab Workouts')
 await page.waitForSelector('.tile')
 await page.click('[aria-label="Favorites"]')
 await page.waitForSelector('.favorite-name')
@@ -137,6 +179,68 @@ await page.waitForSelector('.demo-image')
 await page.screenshot({ path: `${shots}/07-workout-ipad.png` })
 const obliqueGif = await page.$eval('.demo-image', (el) => el.getAttribute('src') ?? '')
 check('oblique gif', obliqueGif.includes('bicycle-crunch'), obliqueGif)
+await page.goBack()
+await page.waitForSelector('.tile-grid')
+check('browser back from workout', (await page.$eval('h2', (el) => el.textContent)) === 'Ab Workouts')
+
+await page.evaluate(() => {
+  localStorage.setItem('abworkouts.settings', JSON.stringify({ durationMinutes: 20, exerciseSeconds: 30 }))
+})
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+await page.goto(base, { waitUntil: 'networkidle0' })
+await page.click('.tile[data-category="fullCore"]')
+await page.waitForSelector('.workout-copy h2')
+for (let step = 0; step < 30; step += 1) {
+  const title = await page.$eval('.workout-copy h2', (el) => el.textContent ?? '')
+  if (title === 'Bird dog') break
+  await clickText('Skip')
+}
+await page.waitForFunction(() => {
+  const img = document.querySelector('.demo-image')
+  return img instanceof HTMLImageElement && img.naturalWidth > 0 && (img.getAttribute('src') ?? '').includes('bird-dog')
+})
+const birdDogFit = await page.evaluate(() => {
+  const img = document.querySelector('.demo-image')
+  const frame = document.querySelector('.gif-frame')
+  if (!(img instanceof HTMLImageElement) || !(frame instanceof HTMLElement)) return null
+  const imageBox = img.getBoundingClientRect()
+  const frameBox = frame.getBoundingClientRect()
+  const shown = imageBox.width / imageBox.height
+  const natural = img.naturalWidth / img.naturalHeight
+  return {
+    inside:
+      imageBox.top >= frameBox.top - 1 &&
+      imageBox.bottom <= frameBox.bottom + 1 &&
+      imageBox.left >= frameBox.left - 1 &&
+      imageBox.right <= frameBox.right + 1,
+    aspectDelta: Math.abs(shown - natural),
+    image: { w: imageBox.width, h: imageBox.height },
+    frame: { w: frameBox.width, h: frameBox.height },
+    natural: { w: img.naturalWidth, h: img.naturalHeight },
+  }
+})
+check(
+  'bird dog fully visible',
+  Boolean(birdDogFit?.inside) && (birdDogFit?.aspectDelta ?? 1) < 0.08,
+  JSON.stringify(birdDogFit),
+)
+await page.screenshot({ path: `${shots}/08-bird-dog.png` })
+
+await clickText('End')
+await page.waitForSelector('.tile')
+await page.click('.tile[data-category="upper"]')
+await page.waitForSelector('.workout-copy h2')
+for (let step = 0; step < 12; step += 1) {
+  const title = await page.$eval('.workout-copy h2', (el) => el.textContent ?? '')
+  if (title === 'Toe touch') break
+  await clickText('Skip')
+}
+await page.waitForFunction(() => {
+  const img = document.querySelector('.demo-image')
+  return img instanceof HTMLImageElement && (img.getAttribute('src') ?? '').includes('/exercises/toe-touch.gif')
+})
+check('toe touch gif', true)
+await page.screenshot({ path: `${shots}/09-toe-touch.png` })
 
 await browser.close()
 

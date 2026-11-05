@@ -1,7 +1,15 @@
 import { categories, categoryInfo, type Category, type WorkoutSettings } from '../data/types'
 import { REST_SECONDS } from '../lib/engine'
 import { SlidersIcon, StarIcon } from '../components/Icons'
+import { StillFrame } from '../components/StillFrame'
 import { TopBar } from '../components/TopBar'
+
+const categoryImage: Record<Category, string> = {
+  upper: '/exercises/crunch.gif',
+  lower: '/exercises/lying-leg-raise.gif',
+  obliques: '/exercises/bicycle-crunch.gif',
+  fullCore: '/exercises/forearm-plank.gif',
+}
 
 export function HomeScreen({
   settings,
@@ -49,7 +57,7 @@ export function HomeScreen({
               data-category={category}
               onClick={() => onStart(category)}
             >
-              <span className="tile-mark" aria-hidden="true" />
+              <StillFrame className="tile-image" src={categoryImage[category]} alt="" />
               <span className="tile-copy">
                 <span className="tile-title">{info.title}</span>
                 <span className="tile-subtitle">{info.subtitle}</span>

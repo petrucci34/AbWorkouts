@@ -12,6 +12,7 @@ import {
   consumedSeconds,
   initialTimerState,
   pauseTimer,
+  previousTimer,
   skipTimer,
   slotCount,
   stepTimer,
@@ -89,6 +90,22 @@ describe('timer', () => {
     expect(state.remaining).toBe(30)
   })
 
+  it('steps back to the previous exercise and replays the move before a rest', () => {
+    const plan = buildCategoryPlan('lower', { durationMinutes: 5, exerciseSeconds: 30 })
+    const start = initialTimerState(plan)
+    expect(previousTimer(plan, start)).toBe(start)
+    let state = skipTimer(plan, start)
+    state = skipTimer(plan, state)
+    const back = previousTimer(plan, state)
+    expect(back.slotIndex).toBe(0)
+    expect(back.phase).toBe('work')
+    expect(back.remaining).toBe(30)
+    const duringRest = previousTimer(plan, { ...state, phase: 'rest', remaining: 2, slotIndex: 1 })
+    expect(duringRest.phase).toBe('work')
+    expect(duringRest.slotIndex).toBe(1)
+    expect(duringRest.remaining).toBe(30)
+  })
+
   it('does not advance while paused', () => {
     const plan = buildCategoryPlan('obliques', { durationMinutes: 5, exerciseSeconds: 30 })
     const paused = pauseTimer(initialTimerState(plan))
@@ -111,17 +128,17 @@ describe('purchased gifs', () => {
     expect(Object.keys(purchaseStemToExerciseId)).toHaveLength(27)
     expect(purchaseStemToExerciseId['front-plank']).toBe('forearm-plank')
     expect(purchaseStemToExerciseId['hollow-hold']).toBe('hollow-body-hold')
-    expect(purchaseStemToExerciseId['lying-toe-touch']).toBe('lying-toe-touch')
+    expect(purchaseStemToExerciseId['lying-toe-touch']).toBe('toe-touch')
     for (const id of new Set(Object.values(purchaseStemToExerciseId))) {
       expect(exerciseById(id), id).toBeTruthy()
       expect(existsSync(resolve('public/exercises', `${id}.gif`)), id).toBe(true)
     }
   })
 
-  it('leaves only toe touch and scissor kicks without a clip', () => {
+  it('leaves only scissor kicks without a clip', () => {
     const wired = new Set(Object.values(purchaseStemToExerciseId))
     const missing = exercises.filter((exercise) => !wired.has(exercise.id)).map((exercise) => exercise.id)
-    expect(missing.sort()).toEqual(['scissor-kicks', 'toe-touch'])
+    expect(missing).toEqual(['scissor-kicks'])
   })
 })
 

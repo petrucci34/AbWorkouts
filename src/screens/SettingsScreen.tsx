@@ -18,6 +18,11 @@ export function SettingsScreen({
     <section className="screen screen-scroll">
       <TopBar
         title="Settings"
+        left={
+          <button type="button" className="text-btn text-btn-muted" onClick={onBack}>
+            Back
+          </button>
+        }
         right={
           <button type="button" className="text-btn" onClick={onBack}>
             Done

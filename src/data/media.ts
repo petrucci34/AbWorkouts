@@ -1,7 +1,7 @@
 /**
  * Purchased files from ab-core-gifs, renamed to exercise ids.
  * front-plank and hollow-hold are the same moves as the existing ids.
- * lying-toe-touch did not match `toe-touch`, so it is its own exercise.
+ * lying-toe-touch is the standing toe-touch clip, so it plays on `toe-touch`.
  */
 export const purchaseStemToExerciseId: Record<string, string> = {
   crunch: 'crunch',
@@ -22,7 +22,7 @@ export const purchaseStemToExerciseId: Record<string, string> = {
   'bird-dog': 'bird-dog',
   'plank-shoulder-taps': 'plank-shoulder-taps',
   'jackknife-v-up': 'jackknife-v-up',
-  'lying-toe-touch': 'lying-toe-touch',
+  'lying-toe-touch': 'toe-touch',
   'windshield-wipers': 'windshield-wipers',
   'v-sit-hold': 'v-sit-hold',
   'bear-crawl': 'bear-crawl',

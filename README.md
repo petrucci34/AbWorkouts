@@ -20,4 +20,4 @@ Then open the local URL Vite prints. `npm run build` writes a static site to `di
 - **Favorites** — exercises you star, with a way to start a session from that list.
 - **Audio** — none. No sound and no vibration.
 
-Exercise clips are the purchased GIFs from `ab-core-gifs`, renamed to exercise ids in `public/exercises/`. Toe touch and scissor kicks have no clip, so the workout shows a short fallback for those two.
+Exercise clips are the purchased GIFs from `ab-core-gifs`, renamed to exercise ids in `public/exercises/`. Scissor kicks has no clip, so that move shows a short fallback.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   initialTimerState,
   pauseTimer,
+  previousTimer,
   skipTimer,
   stepTimer,
   type TimerState,
@@ -12,6 +13,7 @@ export function useWorkoutTimer(plan: WorkoutPlan): {
   state: TimerState
   togglePause: () => void
   skip: () => void
+  previous: () => void
 } {
   const [state, setState] = useState(() => initialTimerState(plan))
 
@@ -30,5 +32,9 @@ export function useWorkoutTimer(plan: WorkoutPlan): {
     setState((current) => skipTimer(plan, current))
   }, [plan])
 
-  return { state, togglePause, skip }
+  const previous = useCallback(() => {
+    setState((current) => previousTimer(plan, current))
+  }, [plan])
+
+  return { state, togglePause, skip, previous }
 }

@@ -101,6 +101,24 @@ export function skipTimer(plan: WorkoutPlan, state: TimerState): TimerState {
   return finishPhase(plan, state)
 }
 
+export function previousTimer(plan: WorkoutPlan, state: TimerState): TimerState {
+  if (state.done || plan.slots.length === 0) return state
+  if (state.phase === 'rest') {
+    const slot = plan.slots[state.slotIndex]
+    if (!slot) return state
+    return { ...state, phase: 'work', remaining: slot.durationSeconds }
+  }
+  if (state.slotIndex <= 0) return state
+  const index = state.slotIndex - 1
+  const slot = plan.slots[index]
+  return {
+    ...state,
+    phase: 'work',
+    slotIndex: index,
+    remaining: slot.durationSeconds,
+  }
+}
+
 export function pauseTimer(state: TimerState): TimerState {
   if (state.done) return state
   return { ...state, paused: !state.paused }

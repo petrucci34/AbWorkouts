@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { exerciseById } from './data/exercises'
 import type { Category, Exercise, WorkoutSettings } from './data/types'
 import { buildCategoryPlan, buildFavoritesPlan, type WorkoutPlan } from './lib/engine'
@@ -14,6 +14,23 @@ type Route =
   | { name: 'favorites' }
   | { name: 'workout'; plan: WorkoutPlan }
 
+type NavState =
+  | { name: 'home'; depth: number }
+  | { name: 'settings'; depth: number }
+  | { name: 'favorites'; depth: number }
+  | { name: 'workout'; depth: number; plan: WorkoutPlan }
+
+function isNavState(value: unknown): value is NavState {
+  if (!value || typeof value !== 'object') return false
+  const name = (value as { name?: unknown }).name
+  return name === 'home' || name === 'settings' || name === 'favorites' || name === 'workout'
+}
+
+function routeFrom(state: NavState): Route {
+  if (state.name === 'workout') return { name: 'workout', plan: state.plan }
+  return { name: state.name }
+}
+
 export function App() {
   const [settings, setSettings] = useState<WorkoutSettings>(loadSettings)
   const [favoriteIds, setFavoriteIds] = useState<string[]>(loadFavorites)
@@ -22,6 +39,53 @@ export function App() {
   const favoriteExercises = favoriteIds
     .map((id) => exerciseById(id))
     .filter((exercise): exercise is Exercise => Boolean(exercise))
+
+  useEffect(() => {
+    if (!isNavState(history.state)) {
+      history.replaceState({ name: 'home', depth: 0 } satisfies NavState, '')
+    } else {
+      setRoute(routeFrom(history.state))
+    }
+
+    const onPop = (event: PopStateEvent) => {
+      if (!isNavState(event.state)) {
+        setRoute({ name: 'home' })
+        return
+      }
+      setRoute(routeFrom(event.state))
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  function show(state: NavState) {
+    setRoute(routeFrom(state))
+  }
+
+  function push(next: Omit<NavState, 'depth'>) {
+    const depth = (isNavState(history.state) ? history.state.depth : 0) + 1
+    const state = { ...next, depth } as NavState
+    history.pushState(state, '')
+    show(state)
+  }
+
+  function back() {
+    const depth = isNavState(history.state) ? history.state.depth : 0
+    if (depth > 0) {
+      history.back()
+      return
+    }
+    show({ name: 'home', depth: 0 })
+  }
+
+  function goHome() {
+    const depth = isNavState(history.state) ? history.state.depth : 0
+    if (depth > 0) {
+      history.go(-depth)
+      return
+    }
+    show({ name: 'home', depth: 0 })
+  }
 
   function changeSettings(next: WorkoutSettings) {
     const clean = normalizeSettings(next)
@@ -38,12 +102,12 @@ export function App() {
   }
 
   function startCategory(category: Category) {
-    setRoute({ name: 'workout', plan: buildCategoryPlan(category, settings) })
+    push({ name: 'workout', plan: buildCategoryPlan(category, settings) })
   }
 
   function startFavorites() {
     if (favoriteExercises.length === 0) return
-    setRoute({ name: 'workout', plan: buildFavoritesPlan(favoriteExercises, settings) })
+    push({ name: 'workout', plan: buildFavoritesPlan(favoriteExercises, settings) })
   }
 
   return (
@@ -53,19 +117,19 @@ export function App() {
           settings={settings}
           favoriteCount={favoriteExercises.length}
           onStart={startCategory}
-          onSettings={() => setRoute({ name: 'settings' })}
-          onFavorites={() => setRoute({ name: 'favorites' })}
+          onSettings={() => push({ name: 'settings' })}
+          onFavorites={() => push({ name: 'favorites' })}
         />
       )}
       {route.name === 'settings' && (
-        <SettingsScreen settings={settings} onChange={changeSettings} onBack={() => setRoute({ name: 'home' })} />
+        <SettingsScreen settings={settings} onChange={changeSettings} onBack={back} />
       )}
       {route.name === 'favorites' && (
         <FavoritesScreen
           exercises={favoriteExercises}
           onRemove={toggleFavorite}
           onStart={startFavorites}
-          onBack={() => setRoute({ name: 'home' })}
+          onBack={back}
         />
       )}
       {route.name === 'workout' && (
@@ -74,7 +138,7 @@ export function App() {
           plan={route.plan}
           favoriteIds={favoriteIds}
           onToggleFavorite={toggleFavorite}
-          onEnd={() => setRoute({ name: 'home' })}
+          onBack={goHome}
         />
       )}
     </div>

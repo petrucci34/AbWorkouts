@@ -7,18 +7,12 @@ function move(id: string, name: string, categories: Category[], cue: string): Ex
 export const exercises: Exercise[] = [
   move('crunch', 'Crunch', ['upper'], 'Ribs toward hips. Keep the low back lightly pressed down.'),
   move('sit-up', 'Sit-up', ['upper'], 'Full range. Shoulders leave the floor, then lower with control.'),
-  move('toe-touch', 'Toe touch', ['upper'], 'Reach toward the toes with legs up or bent. Don\'t yank the neck.'),
+  move('toe-touch', 'Toe touch', ['upper'], 'Hinge at the hips and reach toward the toes. Keep the knees soft.'),
   move(
     'lying-crunch-straight-legs',
     'Lying crunch',
     ['upper'],
     'Legs long and low. Curl the ribs toward the hips.',
-  ),
-  move(
-    'lying-toe-touch',
-    'Lying toe touch',
-    ['upper'],
-    'Legs up. Reach toward the toes without yanking the neck.',
   ),
   move(
     'reverse-crunch',

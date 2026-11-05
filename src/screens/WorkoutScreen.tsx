@@ -14,14 +14,14 @@ export function WorkoutScreen({
   plan,
   favoriteIds,
   onToggleFavorite,
-  onEnd,
+  onBack,
 }: {
   plan: WorkoutPlan
   favoriteIds: string[]
   onToggleFavorite: (id: string) => void
-  onEnd: () => void
+  onBack: () => void
 }) {
-  const { state, togglePause, skip } = useWorkoutTimer(plan)
+  const { state, togglePause, skip, previous } = useWorkoutTimer(plan)
   const slot = plan.slots[state.slotIndex]
   const next = plan.slots[state.slotIndex + 1]
   const shown = state.phase === 'rest' && next ? next.exercise : slot?.exercise
@@ -60,7 +60,7 @@ export function WorkoutScreen({
         <p>
           {plan.title} · {formatDuration(state.elapsed)}
         </p>
-        <button type="button" className="primary" onClick={onEnd}>
+        <button type="button" className="primary" onClick={onBack}>
           Back to Home
         </button>
       </section>
@@ -72,7 +72,7 @@ export function WorkoutScreen({
       <TopBar
         title={plan.title}
         left={
-          <button type="button" className="text-btn text-btn-muted" onClick={onEnd}>
+          <button type="button" className="text-btn text-btn-muted" onClick={onBack}>
             End
           </button>
         }
@@ -95,7 +95,7 @@ export function WorkoutScreen({
         <p>{state.phase === 'rest' ? 'Rest' : `Exercise ${state.slotIndex + 1} of ${plan.slots.length}`}</p>
         <p>Elapsed {formatClock(state.elapsed)}</p>
       </div>
-      <ExerciseDemo exercise={shown} playing={!state.paused} />
+      <ExerciseDemo exercise={shown} playing={state.phase === 'work' && !state.paused} />
       <div className="workout-copy">
         <h2>{state.phase === 'rest' ? 'Rest' : shown.name}</h2>
         <p>{shown.cue}</p>
@@ -108,6 +108,14 @@ export function WorkoutScreen({
         Up next <strong>{upNext}</strong>
       </p>
       <div className="controls">
+        <button
+          type="button"
+          className="control"
+          onClick={previous}
+          disabled={state.phase === 'work' && state.slotIndex === 0}
+        >
+          Previous
+        </button>
         <button type="button" className="control" onClick={togglePause}>
           {state.paused ? 'Resume' : 'Pause'}
         </button>
