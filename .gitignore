@@ -1,17 +1,9 @@
-# Xcode
-DerivedData/
-build/
-*.xcuserstate
-xcuserdata/
-*.moved-aside
-*.hmap
-*.ipa
-*.dSYM.zip
-*.dSYM
-
 # macOS
 .DS_Store
 
-# Swift Package
-.swiftpm/
-Package.resolved
+# Node
+node_modules/
+dist/
+
+# Numbered purchase drop. Wired copies live in public/exercises.
+ab-core-gifs/
