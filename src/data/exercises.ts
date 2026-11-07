@@ -86,12 +86,6 @@ export const exercises: Exercise[] = [
     'Push up, open to a side plank, then switch sides.',
   ),
   move('inchworm', 'Inchworm', ['fullCore'], 'Walk the hands out to a plank, then the feet toward the hands.'),
-  move(
-    'floor-l-sit',
-    'Floor L-sit',
-    ['lower', 'fullCore'],
-    'Press the floor away. Legs stay long and lifted in front.',
-  ),
 ]
 
 export function exercisesFor(category: Category): Exercise[] {

@@ -176,6 +176,75 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .tile-title { font-size: 24px; font-weight: 750; letter-spacing: -0.03em; }
 .tile-subtitle { color: var(--muted); font-size: 14px; line-height: 1.3; }
 
+.builder-link {
+  min-height: 48px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 750;
+}
+
+.saved-start {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field span {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.field input {
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+}
+.field input::placeholder { color: var(--faint); font-weight: 600; }
+
+.builder-note { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.4; }
+
+.catalog { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.catalog-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 18px;
+  background: var(--surface);
+}
+.catalog-row > div { flex: 1; min-width: 0; }
+.catalog-thumb {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #fff;
+}
+.catalog-thumb-empty { display: block; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.row-actions .text-btn { min-height: 32px; font-size: 14px; }
+.text-btn:disabled { opacity: 0.38; }
+
 .settings-block { display: flex; flex-direction: column; gap: 10px; }
 .settings-block h2 { margin: 8px 0 0; font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
 .settings-block p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.4; }

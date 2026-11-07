@@ -29,7 +29,6 @@ export const purchaseStemToExerciseId: Record<string, string> = {
   'plank-hip-dips': 'plank-hip-dips',
   'push-up-to-side-plank': 'push-up-to-side-plank',
   inchworm: 'inchworm',
-  'floor-l-sit': 'floor-l-sit',
 }
 
 const wiredIds = new Set(Object.values(purchaseStemToExerciseId))
