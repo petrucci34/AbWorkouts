@@ -234,7 +234,7 @@ check(
 )
 await page.screenshot({ path: `${shots}/08-bird-dog.png` })
 
-for (const title of ['Jackknife', 'V-sit hold', 'Bear crawl', 'Push-up to side plank']) {
+for (const title of ['Jackknife', 'Bear crawl', 'Push-up to side plank']) {
   for (let step = 0; step < 8; step += 1) {
     const current = await page.$eval('.workout-copy h2', (el) => el.textContent ?? '')
     if (current === title) break

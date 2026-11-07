@@ -24,7 +24,6 @@ export const purchaseStemToExerciseId: Record<string, string> = {
   'jackknife-v-up': 'jackknife-v-up',
   'lying-toe-touch': 'toe-touch',
   'windshield-wipers': 'windshield-wipers',
-  'v-sit-hold': 'v-sit-hold',
   'bear-crawl': 'bear-crawl',
   superman: 'superman',
   'plank-hip-dips': 'plank-hip-dips',

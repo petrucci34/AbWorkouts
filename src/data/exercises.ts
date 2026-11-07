@@ -77,7 +77,6 @@ export const exercises: Exercise[] = [
     ['upper', 'fullCore'],
     'Fold at the hips and reach toward the feet. Lower with control.',
   ),
-  move('v-sit-hold', 'V-sit hold', ['upper', 'fullCore'], 'Balance on the sit bones. Chest tall, legs lifted.'),
   move('bear-crawl', 'Bear crawl', ['fullCore'], 'Knees hover under the hips. Step the opposite hand and foot.'),
   move('superman', 'Superman', ['fullCore'], 'Lift the chest and legs together. Long spine, glutes on.'),
   move(

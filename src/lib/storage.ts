@@ -58,7 +58,10 @@ export function loadFavorites(): string[] {
   try {
     const raw = localStorage.getItem(favoritesKey)
     if (!raw) return []
-    return normalizeFavoriteIds(JSON.parse(raw))
+    const parsed = JSON.parse(raw) as unknown
+    const ids = normalizeFavoriteIds(parsed)
+    if (JSON.stringify(parsed) !== JSON.stringify(ids)) saveFavorites(ids)
+    return ids
   } catch {
     return []
   }

@@ -125,7 +125,9 @@ describe('timer', () => {
 
 describe('purchased gifs', () => {
   it('maps every purchased file onto a library exercise', () => {
-    expect(Object.keys(purchaseStemToExerciseId)).toHaveLength(27)
+    expect(Object.keys(purchaseStemToExerciseId)).toHaveLength(26)
+    expect(purchaseStemToExerciseId['v-sit-hold']).toBeUndefined()
+    expect(exercises.some((exercise) => exercise.id === 'v-sit-hold')).toBe(false)
     expect(purchaseStemToExerciseId['front-plank']).toBe('forearm-plank')
     expect(purchaseStemToExerciseId['hollow-hold']).toBe('hollow-body-hold')
     expect(purchaseStemToExerciseId['lying-toe-touch']).toBe('toe-touch')
@@ -152,7 +154,7 @@ describe('saved settings', () => {
       durationMinutes: 15,
       exerciseSeconds: 60,
     })
-    expect(normalizeFavoriteIds(['crunch', 'nope', 'crunch', 4])).toEqual(['crunch'])
+    expect(normalizeFavoriteIds(['crunch', 'nope', 'v-sit-hold', 'crunch', 4])).toEqual(['crunch'])
   })
 
   it('uses a real category for every library move', () => {
