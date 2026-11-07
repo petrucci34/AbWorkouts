@@ -4,10 +4,11 @@ import { describe, expect, it } from 'vitest'
 import { exerciseById, exercises, exercisesFor } from '../data/exercises'
 import { purchaseStemToExerciseId } from '../data/media'
 import { categories, durationOptions, exerciseLengthOptions, type Category } from '../data/types'
-import { normalizeFavoriteIds, normalizeSettings } from './storage'
+import { normalizeFavoriteIds, normalizeSavedWorkouts, normalizeSettings } from './storage'
 import {
   REST_SECONDS,
   buildCategoryPlan,
+  buildCustomPlan,
   buildFavoritesPlan,
   consumedSeconds,
   initialTimerState,
@@ -59,6 +60,26 @@ describe('workout plans', () => {
     expect(plan.slots[0].exercise.id).toBe(pool[0].id)
     expect(plan.slots[1].exercise.id).toBe(pool[1].id)
     expect(plan.slots[2].exercise.id).toBe(pool[0].id)
+  })
+
+  it('repeats a short custom list and keeps a longer list intact', () => {
+    const settings = { durationMinutes: 5, exerciseSeconds: 60 }
+    expect(slotCount(settings)).toBe(4)
+    const short = [exercises[0], exercises[1]]
+    const repeated = buildCustomPlan(short, settings, ' Morning ')
+    expect(repeated.title).toBe('Morning')
+    expect(repeated.restSeconds).toBe(REST_SECONDS)
+    expect(repeated.slots.map((slot) => slot.exercise.id)).toEqual([
+      short[0].id,
+      short[1].id,
+      short[0].id,
+      short[1].id,
+    ])
+    expect(repeated.totalSeconds).toBe(4 * 60 + 3 * REST_SECONDS)
+    const longPool = exercises.slice(0, 8)
+    const long = buildCustomPlan(longPool, settings, 'Long')
+    expect(long.slots.map((slot) => slot.exercise.id)).toEqual(longPool.map((exercise) => exercise.id))
+    expect(long.totalSeconds).toBe(8 * 60 + 7 * REST_SECONDS)
   })
 })
 
@@ -125,9 +146,10 @@ describe('timer', () => {
 
 describe('purchased gifs', () => {
   it('maps every purchased file onto a library exercise', () => {
-    expect(Object.keys(purchaseStemToExerciseId)).toHaveLength(26)
+    expect(Object.keys(purchaseStemToExerciseId)).toHaveLength(25)
     expect(purchaseStemToExerciseId['v-sit-hold']).toBeUndefined()
-    expect(exercises.some((exercise) => exercise.id === 'v-sit-hold')).toBe(false)
+    expect(purchaseStemToExerciseId['floor-l-sit']).toBeUndefined()
+    expect(exercises.some((exercise) => exercise.id === 'v-sit-hold' || exercise.id === 'floor-l-sit')).toBe(false)
     expect(purchaseStemToExerciseId['front-plank']).toBe('forearm-plank')
     expect(purchaseStemToExerciseId['hollow-hold']).toBe('hollow-body-hold')
     expect(purchaseStemToExerciseId['lying-toe-touch']).toBe('toe-touch')
@@ -154,7 +176,15 @@ describe('saved settings', () => {
       durationMinutes: 15,
       exerciseSeconds: 60,
     })
-    expect(normalizeFavoriteIds(['crunch', 'nope', 'v-sit-hold', 'crunch', 4])).toEqual(['crunch'])
+    expect(normalizeFavoriteIds(['crunch', 'nope', 'v-sit-hold', 'floor-l-sit', 'crunch', 4])).toEqual(['crunch'])
+    expect(
+      normalizeSavedWorkouts([
+        { id: 'a', name: '  Core  ', exerciseIds: ['crunch', 'nope', 'floor-l-sit', 'sit-up', 'crunch'] },
+        { id: 'a', name: 'Duplicate', exerciseIds: ['crunch'] },
+        { id: 'b', name: '   ', exerciseIds: ['crunch'] },
+        { name: 'Missing id', exerciseIds: ['crunch'] },
+      ]),
+    ).toEqual([{ id: 'a', name: 'Core', exerciseIds: ['crunch', 'sit-up', 'crunch'] }])
   })
 
   it('uses a real category for every library move', () => {

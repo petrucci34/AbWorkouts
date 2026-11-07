@@ -70,3 +70,48 @@ export function loadFavorites(): string[] {
 export function saveFavorites(ids: string[]): void {
   localStorage.setItem(favoritesKey, JSON.stringify(normalizeFavoriteIds(ids)))
 }
+
+export interface SavedWorkout {
+  id: string
+  name: string
+  exerciseIds: string[]
+}
+
+const customWorkoutsKey = 'abworkouts.customWorkouts'
+
+export function normalizeSavedWorkouts(value: unknown): SavedWorkout[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const workouts: SavedWorkout[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue
+    const record = entry as Record<string, unknown>
+    if (typeof record.id !== 'string' || seen.has(record.id) || typeof record.name !== 'string') continue
+    const name = record.name.trim()
+    if (!name || !Array.isArray(record.exerciseIds)) continue
+    const exerciseIds = record.exerciseIds.filter(
+      (id): id is string => typeof id === 'string' && Boolean(exerciseById(id)),
+    )
+    if (exerciseIds.length === 0) continue
+    seen.add(record.id)
+    workouts.push({ id: record.id, name, exerciseIds })
+  }
+  return workouts
+}
+
+export function loadCustomWorkouts(): SavedWorkout[] {
+  try {
+    const raw = localStorage.getItem(customWorkoutsKey)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    const workouts = normalizeSavedWorkouts(parsed)
+    if (JSON.stringify(parsed) !== JSON.stringify(workouts)) saveCustomWorkouts(workouts)
+    return workouts
+  } catch {
+    return []
+  }
+}
+
+export function saveCustomWorkouts(workouts: SavedWorkout[]): void {
+  localStorage.setItem(customWorkoutsKey, JSON.stringify(normalizeSavedWorkouts(workouts)))
+}
