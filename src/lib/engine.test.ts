@@ -1,13 +1,20 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { exerciseById, exercises, exercisesFor } from '../data/exercises'
-import { purchaseStemToExerciseId } from '../data/media'
+import { gifUrl, purchaseStemToExerciseId } from '../data/media'
 import { categories, durationOptions, exerciseLengthOptions, type Category } from '../data/types'
-import { normalizeFavoriteIds, normalizeSettings } from './storage'
+import {
+  loadCustomWorkouts,
+  loadFavorites,
+  normalizeCustomWorkouts,
+  normalizeFavoriteIds,
+  normalizeSettings,
+} from './storage'
 import {
   REST_SECONDS,
   buildCategoryPlan,
+  buildCustomPlan,
   buildFavoritesPlan,
   consumedSeconds,
   initialTimerState,
@@ -59,6 +66,31 @@ describe('workout plans', () => {
     expect(plan.slots[0].exercise.id).toBe(pool[0].id)
     expect(plan.slots[1].exercise.id).toBe(pool[1].id)
     expect(plan.slots[2].exercise.id).toBe(pool[0].id)
+  })
+
+  it('repeats a short custom list and plays a long list once', () => {
+    const settings = { durationMinutes: 5, exerciseSeconds: 60 }
+    const filled = slotCount(settings)
+    const short = [exercises[0], exercises[1]]
+    const repeated = buildCustomPlan(short, settings, 'Short')
+    expect(repeated.title).toBe('Short')
+    expect(repeated.restSeconds).toBe(REST_SECONDS)
+    expect(repeated.slots.length).toBe(filled)
+    expect(repeated.slots.map((slot) => slot.exercise.id)).toEqual(
+      Array.from({ length: filled }, (_, index) => short[index % short.length].id),
+    )
+    expect(repeated.totalSeconds).toBeLessThanOrEqual(settings.durationMinutes * 60)
+
+    const long = exercises.slice(0, filled + 2)
+    const once = buildCustomPlan(long, settings, 'Long')
+    expect(once.slots.map((slot) => slot.exercise.id)).toEqual(long.map((exercise) => exercise.id))
+    expect(once.slots.every((slot) => slot.durationSeconds === settings.exerciseSeconds)).toBe(true)
+    expect(once.totalSeconds).toBe(long.length * settings.exerciseSeconds + (long.length - 1) * REST_SECONDS)
+    expect(once.totalSeconds).toBeGreaterThan(settings.durationMinutes * 60)
+
+    const exact = exercises.slice(0, filled)
+    const same = buildCustomPlan(exact, settings, 'Exact')
+    expect(same.slots.map((slot) => slot.exercise.id)).toEqual(exact.map((exercise) => exercise.id))
   })
 })
 
@@ -125,9 +157,13 @@ describe('timer', () => {
 
 describe('purchased gifs', () => {
   it('maps every purchased file onto a library exercise', () => {
-    expect(Object.keys(purchaseStemToExerciseId)).toHaveLength(26)
+    expect(Object.keys(purchaseStemToExerciseId)).toHaveLength(25)
     expect(purchaseStemToExerciseId['v-sit-hold']).toBeUndefined()
+    expect(purchaseStemToExerciseId['floor-l-sit']).toBeUndefined()
     expect(exercises.some((exercise) => exercise.id === 'v-sit-hold')).toBe(false)
+    expect(exercises.some((exercise) => exercise.id === 'floor-l-sit')).toBe(false)
+    expect(existsSync(resolve('public/exercises/floor-l-sit.gif'))).toBe(true)
+    expect(gifUrl('floor-l-sit')).toBeNull()
     expect(purchaseStemToExerciseId['front-plank']).toBe('forearm-plank')
     expect(purchaseStemToExerciseId['hollow-hold']).toBe('hollow-body-hold')
     expect(purchaseStemToExerciseId['lying-toe-touch']).toBe('toe-touch')
@@ -154,7 +190,43 @@ describe('saved settings', () => {
       durationMinutes: 15,
       exerciseSeconds: 60,
     })
-    expect(normalizeFavoriteIds(['crunch', 'nope', 'v-sit-hold', 'crunch', 4])).toEqual(['crunch'])
+    expect(normalizeFavoriteIds(['crunch', 'nope', 'v-sit-hold', 'floor-l-sit', 'crunch', 4])).toEqual(['crunch'])
+    expect(
+      normalizeCustomWorkouts([
+        { id: 'a', name: '  Core  ', exerciseIds: ['crunch', 'floor-l-sit', 'crunch', 'nope'] },
+        { id: 'b', name: '   ', exerciseIds: ['sit-up'] },
+        { id: 'a', name: 'Duplicate', exerciseIds: ['sit-up'] },
+        { id: 'c', name: 'Only removed', exerciseIds: ['floor-l-sit'] },
+      ]),
+    ).toEqual([{ id: 'a', name: 'Core', exerciseIds: ['crunch'] }])
+  })
+
+  it('drops a saved floor L-sit favorite and custom move on the next load', () => {
+    const memory = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        memory.set(key, value)
+      },
+      removeItem: (key: string) => {
+        memory.delete(key)
+      },
+      clear: () => {
+        memory.clear()
+      },
+    })
+    memory.set('abworkouts.favorites', JSON.stringify(['floor-l-sit', 'crunch']))
+    memory.set(
+      'abworkouts.customWorkouts',
+      JSON.stringify([{ id: 'core', name: 'Core', exerciseIds: ['floor-l-sit', 'dead-bug'] }]),
+    )
+    expect(loadFavorites()).toEqual(['crunch'])
+    expect(JSON.parse(memory.get('abworkouts.favorites') ?? 'null')).toEqual(['crunch'])
+    expect(loadCustomWorkouts()).toEqual([{ id: 'core', name: 'Core', exerciseIds: ['dead-bug'] }])
+    expect(JSON.parse(memory.get('abworkouts.customWorkouts') ?? 'null')).toEqual([
+      { id: 'core', name: 'Core', exerciseIds: ['dead-bug'] },
+    ])
+    vi.unstubAllGlobals()
   })
 
   it('uses a real category for every library move', () => {
