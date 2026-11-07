@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react'
 import { exerciseById } from './data/exercises'
-import type { Category, Exercise, WorkoutSettings } from './data/types'
-import { buildCategoryPlan, buildFavoritesPlan, type WorkoutPlan } from './lib/engine'
-import { loadFavorites, loadSettings, normalizeSettings, saveFavorites, saveSettings } from './lib/storage'
+import type { Category, Exercise, SavedWorkout, WorkoutSettings } from './data/types'
+import { buildCategoryPlan, buildCustomPlan, buildFavoritesPlan, type WorkoutPlan } from './lib/engine'
+import {
+  loadCustomWorkouts,
+  loadFavorites,
+  loadSettings,
+  normalizeSettings,
+  saveCustomWorkouts,
+  saveFavorites,
+  saveSettings,
+} from './lib/storage'
+import { BuilderScreen } from './screens/BuilderScreen'
 import { FavoritesScreen } from './screens/FavoritesScreen'
 import { HomeScreen } from './screens/HomeScreen'
+import { SavedWorkoutsScreen } from './screens/SavedWorkoutsScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkoutScreen } from './screens/WorkoutScreen'
 
@@ -12,24 +22,33 @@ type Route =
   | { name: 'home' }
   | { name: 'settings' }
   | { name: 'favorites' }
+  | { name: 'builder' }
+  | { name: 'saved' }
   | { name: 'workout'; plan: WorkoutPlan }
 
 type NavState =
   | { name: 'home'; depth: number }
   | { name: 'settings'; depth: number }
   | { name: 'favorites'; depth: number }
+  | { name: 'builder'; depth: number }
+  | { name: 'saved'; depth: number }
   | { name: 'workout'; depth: number; plan: WorkoutPlan }
 
 type NavInput =
   | { name: 'home' }
   | { name: 'settings' }
   | { name: 'favorites' }
+  | { name: 'builder' }
+  | { name: 'saved' }
   | { name: 'workout'; plan: WorkoutPlan }
+
+const screenNames = ['home', 'settings', 'favorites', 'builder', 'saved', 'workout'] as const
 
 function isNavState(value: unknown): value is NavState {
   if (!value || typeof value !== 'object') return false
-  const name = (value as { name?: unknown }).name
-  return name === 'home' || name === 'settings' || name === 'favorites' || name === 'workout'
+  const record = value as { name?: unknown; plan?: unknown }
+  if (record.name === 'workout') return Boolean(record.plan && typeof record.plan === 'object')
+  return typeof record.name === 'string' && screenNames.includes(record.name as (typeof screenNames)[number])
 }
 
 function routeFrom(state: NavState): Route {
@@ -40,6 +59,7 @@ function routeFrom(state: NavState): Route {
 export function App() {
   const [settings, setSettings] = useState<WorkoutSettings>(loadSettings)
   const [favoriteIds, setFavoriteIds] = useState<string[]>(loadFavorites)
+  const [customWorkouts, setCustomWorkouts] = useState<SavedWorkout[]>(loadCustomWorkouts)
   const [route, setRoute] = useState<Route>({ name: 'home' })
 
   const favoriteExercises = favoriteIds
@@ -116,19 +136,60 @@ export function App() {
     push({ name: 'workout', plan: buildFavoritesPlan(favoriteExercises, settings) })
   }
 
+  function saveCustomWorkout(workout: SavedWorkout) {
+    setCustomWorkouts((current) => {
+      const next = [...current, workout]
+      saveCustomWorkouts(next)
+      return next
+    })
+    push({ name: 'saved' })
+  }
+
+  function deleteCustomWorkout(id: string) {
+    setCustomWorkouts((current) => {
+      const next = current.filter((workout) => workout.id !== id)
+      saveCustomWorkouts(next)
+      return next
+    })
+  }
+
+  function startCustomWorkout(id: string) {
+    const workout = customWorkouts.find((item) => item.id === id)
+    if (!workout) return
+    const pool = workout.exerciseIds
+      .map((exerciseId) => exerciseById(exerciseId))
+      .filter((exercise): exercise is Exercise => Boolean(exercise))
+    if (pool.length === 0) return
+    push({ name: 'workout', plan: buildCustomPlan(pool, settings, workout.name) })
+  }
+
   return (
     <div className="app-shell">
       {route.name === 'home' && (
         <HomeScreen
           settings={settings}
           favoriteCount={favoriteExercises.length}
+          savedCount={customWorkouts.length}
           onStart={startCategory}
           onSettings={() => push({ name: 'settings' })}
           onFavorites={() => push({ name: 'favorites' })}
+          onBuild={() => push({ name: 'builder' })}
+          onSaved={() => push({ name: 'saved' })}
         />
       )}
       {route.name === 'settings' && (
         <SettingsScreen settings={settings} onChange={changeSettings} onBack={back} />
+      )}
+      {route.name === 'builder' && <BuilderScreen onSave={saveCustomWorkout} onBack={back} />}
+      {route.name === 'saved' && (
+        <SavedWorkoutsScreen
+          workouts={customWorkouts}
+          settings={settings}
+          onStart={startCustomWorkout}
+          onDelete={deleteCustomWorkout}
+          onBuild={() => push({ name: 'builder' })}
+          onBack={back}
+        />
       )}
       {route.name === 'favorites' && (
         <FavoritesScreen

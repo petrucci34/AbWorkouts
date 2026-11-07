@@ -75,6 +75,31 @@ export function buildFavoritesPlan(pool: Exercise[], settings: WorkoutSettings):
   return buildPlan(pool, category, settings, { title: 'Favorites', isFavorites: true })
 }
 
+export function buildCustomPlan(pool: Exercise[], settings: WorkoutSettings, title: string): WorkoutPlan {
+  if (pool.length === 0) {
+    throw new Error('Cannot build a workout with no exercises')
+  }
+
+  const filled = slotCount(settings)
+  const count = pool.length < filled ? filled : pool.length
+  const slots: WorkoutSlot[] = Array.from({ length: count }, (_, index) => ({
+    exercise: pool[index % pool.length],
+    durationSeconds: settings.exerciseSeconds,
+  }))
+  const rests = Math.max(0, count - 1)
+
+  return {
+    id: crypto.randomUUID(),
+    category: pool[0].categories[0] ?? 'fullCore',
+    title,
+    isFavorites: false,
+    settings,
+    slots,
+    restSeconds: REST_SECONDS,
+    totalSeconds: count * settings.exerciseSeconds + rests * REST_SECONDS,
+  }
+}
+
 export function initialTimerState(plan: WorkoutPlan): TimerState {
   const first = plan.slots[0]
   return {

@@ -15,15 +15,21 @@ const categoryImage: Record<Category, string> = {
 export function HomeScreen({
   settings,
   favoriteCount,
+  savedCount,
   onStart,
   onSettings,
   onFavorites,
+  onBuild,
+  onSaved,
 }: {
   settings: WorkoutSettings
   favoriteCount: number
+  savedCount: number
   onStart: (category: Category) => void
   onSettings: () => void
   onFavorites: () => void
+  onBuild: () => void
+  onSaved: () => void
 }) {
   return (
     <section className="screen screen-scroll">
@@ -47,6 +53,14 @@ export function HomeScreen({
       <p className="chip" aria-label={`Session timing ${settings.durationMinutes} minutes, ${settings.exerciseSeconds} seconds per exercise, ${REST_SECONDS} seconds rest`}>
         {settings.durationMinutes} min · {settings.exerciseSeconds}s each · {REST_SECONDS}s rest
       </p>
+      <div className="home-links">
+        <button type="button" className="home-link" onClick={onBuild}>
+          Build a workout
+        </button>
+        <button type="button" className="home-link" onClick={onSaved}>
+          Saved workouts{savedCount > 0 ? ` · ${savedCount}` : ''}
+        </button>
+      </div>
       <div className="tile-grid">
         {categories.map((category) => {
           const info = categoryInfo[category]
