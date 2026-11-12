@@ -21,29 +21,33 @@ export function useWorkoutTimer(plan: WorkoutPlan): {
   useEffect(() => {
     const id = window.setInterval(() => {
       const now = Date.now()
-      setState((current) => {
-        if (current.done) return current
-        const elapsed = sessionElapsed(current.startedAt, now)
-        const stepped = stepTimer(plan, current)
-        if (stepped.done) return { ...stepped, elapsed }
-        if (stepped === current && current.elapsed === elapsed) return current
-        return { ...stepped, elapsed }
-      })
+      setState((current) => stampElapsed(current, stepTimer(plan, current), now))
     }, 1000)
     return () => window.clearInterval(id)
   }, [plan])
 
   const togglePause = useCallback(() => {
-    setState((current) => pauseTimer(current))
+    const now = Date.now()
+    setState((current) => stampElapsed(current, pauseTimer(current), now))
   }, [])
 
   const skip = useCallback(() => {
-    setState((current) => skipTimer(plan, current))
+    const now = Date.now()
+    setState((current) => stampElapsed(current, skipTimer(plan, current), now))
   }, [plan])
 
   const previous = useCallback(() => {
-    setState((current) => previousTimer(plan, current))
+    const now = Date.now()
+    setState((current) => stampElapsed(current, previousTimer(plan, current), now))
   }, [plan])
 
   return { state, togglePause, skip, previous }
+}
+
+function stampElapsed(current: TimerState, next: TimerState, now: number): TimerState {
+  if (current.done) return current
+  const elapsed = sessionElapsed(current.startedAt, now)
+  if (next.done) return { ...next, elapsed }
+  if (next === current && current.elapsed === elapsed) return current
+  return { ...next, elapsed }
 }
