@@ -25,7 +25,10 @@ export interface TimerState {
   phase: TimerPhase
   slotIndex: number
   remaining: number
+  /** Wall-clock seconds since the session began. Frozen once `done` is set. */
   elapsed: number
+  /** Epoch ms when the session began. Elapsed keeps running through pause, skip, and back. */
+  startedAt: number
   paused: boolean
   done: boolean
 }
@@ -35,6 +38,17 @@ export function slotCount(settings: WorkoutSettings): number {
   const work = Math.max(settings.exerciseSeconds, 1)
   const count = Math.floor((total + REST_SECONDS) / (work + REST_SECONDS))
   return Math.max(1, count)
+}
+
+function workDurations(count: number, exerciseSeconds: number, budget: number): number[] {
+  const rests = Math.max(0, count - 1)
+  const durations = Array.from({ length: count }, () => exerciseSeconds)
+  let extra = Math.max(0, budget - (count * exerciseSeconds + rests * REST_SECONDS))
+  for (let index = 0; extra > 0; index += 1) {
+    durations[index % count] += 1
+    extra -= 1
+  }
+  return durations
 }
 
 export function buildPlan(
@@ -48,11 +62,12 @@ export function buildPlan(
   }
 
   const count = slotCount(settings)
-  const slots: WorkoutSlot[] = Array.from({ length: count }, (_, index) => ({
+  const budget = settings.durationMinutes * 60
+  const durations = workDurations(count, settings.exerciseSeconds, budget)
+  const slots: WorkoutSlot[] = durations.map((durationSeconds, index) => ({
     exercise: pool[index % pool.length],
-    durationSeconds: settings.exerciseSeconds,
+    durationSeconds,
   }))
-  const rests = Math.max(0, count - 1)
 
   return {
     id: crypto.randomUUID(),
@@ -62,7 +77,7 @@ export function buildPlan(
     settings,
     slots,
     restSeconds: REST_SECONDS,
-    totalSeconds: count * settings.exerciseSeconds + rests * REST_SECONDS,
+    totalSeconds: budget,
   }
 }
 
@@ -80,10 +95,15 @@ export function buildCustomPlan(pool: Exercise[], settings: WorkoutSettings, tit
     throw new Error('Cannot build a workout with no exercises')
   }
   const fitted = slotCount(settings)
-  const chosen = pool.length > fitted ? pool : Array.from({ length: fitted }, (_, index) => pool[index % pool.length])
-  const slots: WorkoutSlot[] = chosen.map((exercise) => ({
+  const repeats = pool.length <= fitted
+  const chosen = repeats ? Array.from({ length: fitted }, (_, index) => pool[index % pool.length]) : pool
+  const budget = settings.durationMinutes * 60
+  const durations = repeats
+    ? workDurations(chosen.length, settings.exerciseSeconds, budget)
+    : chosen.map(() => settings.exerciseSeconds)
+  const slots: WorkoutSlot[] = chosen.map((exercise, index) => ({
     exercise,
-    durationSeconds: settings.exerciseSeconds,
+    durationSeconds: durations[index],
   }))
   const rests = Math.max(0, slots.length - 1)
   const name = title.trim() || 'Custom'
@@ -95,7 +115,7 @@ export function buildCustomPlan(pool: Exercise[], settings: WorkoutSettings, tit
     settings,
     slots,
     restSeconds: REST_SECONDS,
-    totalSeconds: slots.length * settings.exerciseSeconds + rests * REST_SECONDS,
+    totalSeconds: durations.reduce((sum, duration) => sum + duration, 0) + rests * REST_SECONDS,
   }
 }
 
@@ -106,6 +126,7 @@ export function initialTimerState(plan: WorkoutPlan): TimerState {
     slotIndex: 0,
     remaining: first?.durationSeconds ?? 0,
     elapsed: 0,
+    startedAt: Date.now(),
     paused: false,
     done: plan.slots.length === 0,
   }
@@ -114,10 +135,14 @@ export function initialTimerState(plan: WorkoutPlan): TimerState {
 export function stepTimer(plan: WorkoutPlan, state: TimerState): TimerState {
   if (state.paused || state.done) return state
   if (state.remaining > 1) {
-    return { ...state, remaining: state.remaining - 1, elapsed: state.elapsed + 1 }
+    return { ...state, remaining: state.remaining - 1 }
   }
-  const elapsed = state.elapsed + (state.remaining > 0 ? 1 : 0)
-  return finishPhase(plan, { ...state, remaining: 0, elapsed })
+  return finishPhase(plan, { ...state, remaining: 0 })
+}
+
+/** Seconds from session start to `now`. Pause, skip, and previous do not stop this clock. */
+export function sessionElapsed(startedAt: number, now: number): number {
+  return Math.max(0, Math.floor((now - startedAt) / 1000))
 }
 
 export function skipTimer(plan: WorkoutPlan, state: TimerState): TimerState {

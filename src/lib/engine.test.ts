@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { catalog, categoryCovers } from '../data/catalog'
 import { exerciseById, exercises, exercisesFor } from '../data/exercises'
-import { purchaseStemToExerciseId } from '../data/media'
 import { categories, durationOptions, exerciseLengthOptions, type Category } from '../data/types'
 import { normalizeFavoriteIds, normalizeSavedWorkouts, normalizeSettings } from './storage'
 import {
@@ -11,9 +11,11 @@ import {
   buildCustomPlan,
   buildFavoritesPlan,
   consumedSeconds,
+  formatDuration,
   initialTimerState,
   pauseTimer,
   previousTimer,
+  sessionElapsed,
   skipTimer,
   slotCount,
   stepTimer,
@@ -28,9 +30,10 @@ describe('workout plans', () => {
         const budget = minutes * 60
         expect(plan.restSeconds).toBe(REST_SECONDS)
         expect(plan.slots.length).toBe(slotCount(settings))
-        expect(plan.totalSeconds).toBeLessThanOrEqual(budget)
-        expect(plan.totalSeconds + seconds + REST_SECONDS).toBeGreaterThan(budget)
-        expect(plan.slots.every((slot) => slot.durationSeconds === seconds)).toBe(true)
+        expect(plan.totalSeconds).toBe(budget)
+        const durations = plan.slots.map((slot) => slot.durationSeconds)
+        expect(Math.min(...durations)).toBeGreaterThanOrEqual(seconds)
+        expect(Math.max(...durations) - Math.min(...durations)).toBeLessThanOrEqual(1)
         expect(plan.slots.every((slot) => slot.exercise.categories.includes('upper'))).toBe(true)
       }
     }
@@ -75,7 +78,7 @@ describe('workout plans', () => {
       short[0].id,
       short[1].id,
     ])
-    expect(repeated.totalSeconds).toBe(4 * 60 + 3 * REST_SECONDS)
+    expect(repeated.totalSeconds).toBe(5 * 60)
     const longPool = exercises.slice(0, 8)
     const long = buildCustomPlan(longPool, settings, 'Long')
     expect(long.slots.map((slot) => slot.exercise.id)).toEqual(longPool.map((exercise) => exercise.id))
@@ -84,17 +87,52 @@ describe('workout plans', () => {
 })
 
 describe('timer', () => {
+  it('finishes a 10 minute session of 60 second exercises at 10 minutes', () => {
+    const plan = buildCategoryPlan('upper', { durationMinutes: 10, exerciseSeconds: 60 })
+    expect(plan.slots).toHaveLength(9)
+    expect(plan.slots.every((slot) => slot.durationSeconds === 64)).toBe(true)
+    expect(formatDuration(plan.totalSeconds)).toBe('10 min')
+    let state = initialTimerState(plan)
+    for (let second = 0; second < plan.totalSeconds; second += 1) {
+      expect(state.done).toBe(false)
+      state = stepTimer(plan, state)
+    }
+    expect(state.done).toBe(true)
+    expect(plan.totalSeconds).toBe(600)
+    expect(sessionElapsed(state.startedAt, state.startedAt + 600_000)).toBe(600)
+    expect(formatDuration(sessionElapsed(state.startedAt, state.startedAt + 600_000))).toBe('10 min')
+  })
+
   it('counts down a 30 second interval and then finishes a single move', () => {
     const plan = buildCategoryPlan('upper', { durationMinutes: 5, exerciseSeconds: 30 })
-    const only = { ...plan, slots: [plan.slots[0]], totalSeconds: 30 }
+    const only = { ...plan, slots: [{ ...plan.slots[0], durationSeconds: 30 }], totalSeconds: 30 }
     let state = initialTimerState(only)
     for (let second = 0; second < 29; second += 1) state = stepTimer(only, state)
     expect(state.done).toBe(false)
     expect(state.remaining).toBe(1)
-    expect(state.elapsed).toBe(29)
+    expect(state.elapsed).toBe(0)
     state = stepTimer(only, state)
     expect(state.done).toBe(true)
-    expect(state.elapsed).toBe(30)
+    expect(state.elapsed).toBe(0)
+  })
+
+  it('measures session length on the wall clock through pause, skip, and back', () => {
+    const plan = buildCategoryPlan('upper', { durationMinutes: 5, exerciseSeconds: 30 })
+    const startedAt = 1_700_000_000_000
+    let state = { ...initialTimerState(plan), startedAt, elapsed: 0 }
+    state = pauseTimer(state)
+    expect(stepTimer(plan, state)).toBe(state)
+    expect(sessionElapsed(state.startedAt, startedAt + 20_000)).toBe(20)
+
+    state = skipTimer(plan, state)
+    expect(state.phase).toBe('rest')
+    expect(state.startedAt).toBe(startedAt)
+    expect(sessionElapsed(state.startedAt, startedAt + 25_000)).toBe(25)
+
+    state = previousTimer(plan, state)
+    expect(state.phase).toBe('work')
+    expect(state.slotIndex).toBe(0)
+    expect(sessionElapsed(state.startedAt, startedAt + 40_000)).toBe(40)
   })
 
   it('inserts a 3 second rest between moves and skip jumps the phase', () => {
@@ -108,7 +146,7 @@ describe('timer', () => {
     state = skipTimer(plan, state)
     expect(state.phase).toBe('work')
     expect(state.slotIndex).toBe(1)
-    expect(state.remaining).toBe(30)
+    expect(state.remaining).toBe(plan.slots[1].durationSeconds)
   })
 
   it('steps back to the previous exercise and replays the move before a rest', () => {
@@ -120,11 +158,11 @@ describe('timer', () => {
     const back = previousTimer(plan, state)
     expect(back.slotIndex).toBe(0)
     expect(back.phase).toBe('work')
-    expect(back.remaining).toBe(30)
+    expect(back.remaining).toBe(plan.slots[0].durationSeconds)
     const duringRest = previousTimer(plan, { ...state, phase: 'rest', remaining: 2, slotIndex: 1 })
     expect(duringRest.phase).toBe('work')
     expect(duringRest.slotIndex).toBe(1)
-    expect(duringRest.remaining).toBe(30)
+    expect(duringRest.remaining).toBe(plan.slots[1].durationSeconds)
   })
 
   it('does not advance while paused', () => {
@@ -138,31 +176,29 @@ describe('timer', () => {
     const start = initialTimerState(plan)
     expect(consumedSeconds(plan, start)).toBe(0)
     const midway = { ...start, remaining: 15, elapsed: 15 }
-    expect(consumedSeconds(plan, midway)).toBe(15)
+    expect(consumedSeconds(plan, midway)).toBe(plan.slots[0].durationSeconds - 15)
     const resting = { ...start, phase: 'rest' as const, remaining: 3, elapsed: 30 }
-    expect(consumedSeconds(plan, resting)).toBe(30)
+    expect(consumedSeconds(plan, resting)).toBe(plan.slots[0].durationSeconds)
   })
 })
 
-describe('purchased gifs', () => {
-  it('maps every purchased file onto a library exercise', () => {
-    expect(Object.keys(purchaseStemToExerciseId)).toHaveLength(25)
-    expect(purchaseStemToExerciseId['v-sit-hold']).toBeUndefined()
-    expect(purchaseStemToExerciseId['floor-l-sit']).toBeUndefined()
-    expect(exercises.some((exercise) => exercise.id === 'v-sit-hold' || exercise.id === 'floor-l-sit')).toBe(false)
-    expect(purchaseStemToExerciseId['front-plank']).toBe('forearm-plank')
-    expect(purchaseStemToExerciseId['hollow-hold']).toBe('hollow-body-hold')
-    expect(purchaseStemToExerciseId['lying-toe-touch']).toBe('toe-touch')
-    for (const id of new Set(Object.values(purchaseStemToExerciseId))) {
-      expect(exerciseById(id), id).toBeTruthy()
-      expect(existsSync(resolve('public/exercises', `${id}.gif`)), id).toBe(true)
+describe('exercise catalog', () => {
+  it('points every clip at a real file', () => {
+    const ids = catalog.map((entry) => entry.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(catalog.some((entry) => entry.id === 'v-sit-hold' || entry.id === 'floor-l-sit')).toBe(false)
+    const stems = catalog.flatMap((entry) => (entry.gif ? [entry.gif] : []))
+    expect(new Set(stems).size).toBe(stems.length)
+    expect(stems).toHaveLength(catalog.length)
+    for (const stem of stems) {
+      expect(existsSync(resolve('public/exercises', `${stem}.gif`)), stem).toBe(true)
+      expect(exerciseById(catalog.find((entry) => entry.gif === stem)?.id ?? ''), stem).toBeTruthy()
     }
-  })
-
-  it('leaves only scissor kicks without a clip', () => {
-    const wired = new Set(Object.values(purchaseStemToExerciseId))
-    const missing = exercises.filter((exercise) => !wired.has(exercise.id)).map((exercise) => exercise.id)
-    expect(missing).toEqual(['scissor-kicks'])
+    expect(catalog.filter((entry) => !entry.gif)).toEqual([])
+    for (const category of categories) {
+      const cover = catalog.find((entry) => entry.id === categoryCovers[category])
+      expect(cover?.gif, category).toBeTruthy()
+    }
   })
 })
 

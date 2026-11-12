@@ -4,6 +4,7 @@ import {
   exerciseLengthOptions,
   type WorkoutSettings,
 } from '../data/types'
+import { normalizeHistory, type WorkoutLog } from './history'
 
 const settingsKey = 'abworkouts.settings'
 const favoritesKey = 'abworkouts.favorites'
@@ -114,4 +115,23 @@ export function loadCustomWorkouts(): SavedWorkout[] {
 
 export function saveCustomWorkouts(workouts: SavedWorkout[]): void {
   localStorage.setItem(customWorkoutsKey, JSON.stringify(normalizeSavedWorkouts(workouts)))
+}
+
+const historyKey = 'abworkouts.history'
+
+export function loadHistory(): WorkoutLog[] {
+  try {
+    const raw = localStorage.getItem(historyKey)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    const logs = normalizeHistory(parsed)
+    if (JSON.stringify(parsed) !== JSON.stringify(logs)) saveHistory(logs)
+    return logs
+  } catch {
+    return []
+  }
+}
+
+export function saveHistory(logs: WorkoutLog[]): void {
+  localStorage.setItem(historyKey, JSON.stringify(normalizeHistory(logs)))
 }

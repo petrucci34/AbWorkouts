@@ -3,6 +3,7 @@ import {
   initialTimerState,
   pauseTimer,
   previousTimer,
+  sessionElapsed,
   skipTimer,
   stepTimer,
   type TimerState,
@@ -19,7 +20,15 @@ export function useWorkoutTimer(plan: WorkoutPlan): {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      setState((current) => stepTimer(plan, current))
+      const now = Date.now()
+      setState((current) => {
+        if (current.done) return current
+        const elapsed = sessionElapsed(current.startedAt, now)
+        const stepped = stepTimer(plan, current)
+        if (stepped.done) return { ...stepped, elapsed }
+        if (stepped === current && current.elapsed === elapsed) return current
+        return { ...stepped, elapsed }
+      })
     }, 1000)
     return () => window.clearInterval(id)
   }, [plan])

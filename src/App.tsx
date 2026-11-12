@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { exerciseById } from './data/exercises'
 import type { Category, Exercise, WorkoutSettings } from './data/types'
+import { buildBackup, mergeBackup, type BackupFile } from './lib/backup'
 import { buildCategoryPlan, buildCustomPlan, buildFavoritesPlan, type WorkoutPlan } from './lib/engine'
+import { localDateString, normalizeHistory, type WorkoutLog } from './lib/history'
 import {
   loadCustomWorkouts,
   loadFavorites,
+  loadHistory,
   loadSettings,
   normalizeSettings,
   saveCustomWorkouts,
   saveFavorites,
+  saveHistory,
   saveSettings,
   type SavedWorkout,
 } from './lib/storage'
 import { BuilderScreen } from './screens/BuilderScreen'
 import { FavoritesScreen } from './screens/FavoritesScreen'
+import { HistoryScreen } from './screens/HistoryScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkoutScreen } from './screens/WorkoutScreen'
@@ -23,6 +28,7 @@ type Route =
   | { name: 'settings' }
   | { name: 'favorites' }
   | { name: 'builder' }
+  | { name: 'history' }
   | { name: 'workout'; plan: WorkoutPlan }
 
 type NavState =
@@ -30,6 +36,7 @@ type NavState =
   | { name: 'settings'; depth: number }
   | { name: 'favorites'; depth: number }
   | { name: 'builder'; depth: number }
+  | { name: 'history'; depth: number }
   | { name: 'workout'; depth: number; plan: WorkoutPlan }
 
 type NavInput =
@@ -37,12 +44,20 @@ type NavInput =
   | { name: 'settings' }
   | { name: 'favorites' }
   | { name: 'builder' }
+  | { name: 'history' }
   | { name: 'workout'; plan: WorkoutPlan }
 
 function isNavState(value: unknown): value is NavState {
   if (!value || typeof value !== 'object') return false
   const name = (value as { name?: unknown }).name
-  return name === 'home' || name === 'settings' || name === 'favorites' || name === 'builder' || name === 'workout'
+  return (
+    name === 'home' ||
+    name === 'settings' ||
+    name === 'favorites' ||
+    name === 'builder' ||
+    name === 'history' ||
+    name === 'workout'
+  )
 }
 
 function routeFrom(state: NavState): Route {
@@ -54,6 +69,7 @@ export function App() {
   const [settings, setSettings] = useState<WorkoutSettings>(loadSettings)
   const [favoriteIds, setFavoriteIds] = useState<string[]>(loadFavorites)
   const [customWorkouts, setCustomWorkouts] = useState<SavedWorkout[]>(loadCustomWorkouts)
+  const [logs, setLogs] = useState<WorkoutLog[]>(loadHistory)
   const [route, setRoute] = useState<Route>({ name: 'home' })
 
   const favoriteExercises = favoriteIds
@@ -121,6 +137,52 @@ export function App() {
     })
   }
 
+  const appendLog = useCallback((entry: WorkoutLog) => {
+    setLogs((current) => {
+      if (current.some((item) => item.id === entry.id)) return current
+      const next = normalizeHistory([entry, ...current])
+      saveHistory(next)
+      return next
+    })
+  }, [])
+
+  function deleteLog(id: string) {
+    setLogs((current) => {
+      const next = current.filter((item) => item.id !== id)
+      saveHistory(next)
+      return next
+    })
+  }
+
+  function exportBackup() {
+    const file = buildBackup(
+      { settings, favorites: favoriteIds, savedWorkouts: customWorkouts, history: logs },
+      new Date().toISOString(),
+    )
+    const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `abworkouts-${localDateString(new Date())}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function importBackup(file: BackupFile) {
+    const merged = mergeBackup(
+      { settings, favorites: favoriteIds, savedWorkouts: customWorkouts, history: logs },
+      file,
+    )
+    setSettings(merged.settings)
+    saveSettings(merged.settings)
+    setFavoriteIds(merged.favorites)
+    saveFavorites(merged.favorites)
+    setCustomWorkouts(merged.savedWorkouts)
+    saveCustomWorkouts(merged.savedWorkouts)
+    setLogs(merged.history)
+    saveHistory(merged.history)
+  }
+
   function startCategory(category: Category) {
     push({ name: 'workout', plan: buildCategoryPlan(category, settings) })
   }
@@ -165,16 +227,24 @@ export function App() {
           settings={settings}
           favoriteCount={favoriteExercises.length}
           savedWorkouts={customWorkouts}
+          logs={logs}
           onStart={startCategory}
           onSettings={() => push({ name: 'settings' })}
           onFavorites={() => push({ name: 'favorites' })}
+          onHistory={() => push({ name: 'history' })}
           onBuild={() => push({ name: 'builder' })}
           onStartSaved={startCustomWorkout}
           onDeleteSaved={deleteCustomWorkout}
         />
       )}
       {route.name === 'settings' && (
-        <SettingsScreen settings={settings} onChange={changeSettings} onBack={back} />
+        <SettingsScreen
+          settings={settings}
+          onChange={changeSettings}
+          onBack={back}
+          onExport={exportBackup}
+          onImport={importBackup}
+        />
       )}
       {route.name === 'favorites' && (
         <FavoritesScreen
@@ -185,11 +255,14 @@ export function App() {
         />
       )}
       {route.name === 'builder' && <BuilderScreen onBack={back} onSave={saveCustomWorkout} />}
+      {route.name === 'history' && <HistoryScreen logs={logs} onDelete={deleteLog} onBack={back} />}
       {route.name === 'workout' && (
         <WorkoutScreen
           key={route.plan.id}
           plan={route.plan}
           favoriteIds={favoriteIds}
+          logs={logs}
+          onLog={appendLog}
           onToggleFavorite={toggleFavorite}
           onBack={goHome}
         />

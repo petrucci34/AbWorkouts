@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ExerciseDemo } from '../components/LoopingGif'
 import { CheckIcon, StarIcon } from '../components/Icons'
 import { TopBar } from '../components/TopBar'
@@ -6,28 +6,52 @@ import {
   consumedSeconds,
   formatClock,
   formatDuration,
+  sessionElapsed,
   type WorkoutPlan,
 } from '../lib/engine'
+import { createLog, formatWeekLine, MIN_LOG_SECONDS, type WorkoutLog } from '../lib/history'
 import { useWorkoutTimer } from '../lib/useWorkoutTimer'
 
 export function WorkoutScreen({
   plan,
   favoriteIds,
+  logs,
+  onLog,
   onToggleFavorite,
   onBack,
 }: {
   plan: WorkoutPlan
   favoriteIds: string[]
+  logs: WorkoutLog[]
+  onLog: (entry: WorkoutLog) => void
   onToggleFavorite: (id: string) => void
   onBack: () => void
 }) {
   const { state, togglePause, skip, previous } = useWorkoutTimer(plan)
+  const [entry, setEntry] = useState<WorkoutLog | null>(null)
+  if (state.done && !entry) {
+    setEntry(
+      createLog({
+        id: plan.id,
+        title: plan.title,
+        category: plan.category,
+        plannedSeconds: plan.totalSeconds,
+        elapsedSeconds: state.elapsed,
+        completed: true,
+        now: new Date(),
+      }),
+    )
+  }
   const slot = plan.slots[state.slotIndex]
   const next = plan.slots[state.slotIndex + 1]
   const shown = state.phase === 'rest' && next ? next.exercise : slot?.exercise
   const starred = shown ? favoriteIds.includes(shown.id) : false
   const progress = plan.totalSeconds === 0 ? 0 : consumedSeconds(plan, state) / plan.totalSeconds
   const upNext = next ? next.exercise.name : 'Finish'
+
+  useEffect(() => {
+    if (entry) onLog(entry)
+  }, [entry, onLog])
 
   useEffect(() => {
     let released = false
@@ -52,7 +76,26 @@ export function WorkoutScreen({
     }
   }, [])
 
+  function endEarly() {
+    const elapsed = sessionElapsed(state.startedAt, Date.now())
+    if (!state.done && elapsed >= MIN_LOG_SECONDS) {
+      onLog(
+        createLog({
+          id: `${plan.id}:partial`,
+          title: plan.title,
+          category: plan.category,
+          plannedSeconds: plan.totalSeconds,
+          elapsedSeconds: elapsed,
+          completed: false,
+          now: new Date(),
+        }),
+      )
+    }
+    onBack()
+  }
+
   if (state.done || !shown || !slot) {
+    const recorded = entry ? [entry, ...logs.filter((log) => log.id !== entry.id)] : logs
     return (
       <section className="screen complete">
         <CheckIcon />
@@ -60,6 +103,7 @@ export function WorkoutScreen({
         <p>
           {plan.title} · {formatDuration(state.elapsed)}
         </p>
+        <p className="complete-week">{formatWeekLine(recorded, new Date())}</p>
         <button type="button" className="primary" onClick={onBack}>
           Back to Home
         </button>
@@ -72,7 +116,7 @@ export function WorkoutScreen({
       <TopBar
         title={plan.title}
         left={
-          <button type="button" className="text-btn text-btn-muted" onClick={onBack}>
+          <button type="button" className="text-btn text-btn-muted" onClick={endEarly}>
             End
           </button>
         }
