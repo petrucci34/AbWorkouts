@@ -3,7 +3,6 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - cursor/react-ab-workouts-4f5a
       - main
   workflow_dispatch:
 

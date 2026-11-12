@@ -12,7 +12,7 @@ npm run dev
 
 Then open the local URL Vite prints. `npm run build` writes a static site to `dist/`.
 
-The live site is [petrucci34.github.io/AbWorkouts](https://petrucci34.github.io/AbWorkouts/). Pushes to this branch publish it through GitHub Pages.
+The live site is [petrucci34.github.io/AbWorkouts](https://petrucci34.github.io/AbWorkouts/). Pushes to `main` publish it through GitHub Pages.
 
 Exercise clips live in `public/exercises/`. `src/data/catalog.ts` is the list of moves: name, cue, categories, and the GIF stem.
 
