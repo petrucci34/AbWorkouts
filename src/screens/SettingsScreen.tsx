@@ -51,7 +51,7 @@ export function SettingsScreen({
             </button>
           ))}
         </div>
-        <p>Minutes. Used the next time you tap a category.</p>
+        <p>Minutes. Used the next time you start a category, favorites, or saved workout.</p>
       </div>
       <div className="settings-block">
         <h2>Exercise length</h2>
