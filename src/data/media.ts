@@ -2,6 +2,7 @@
  * Purchased files from ab-core-gifs, renamed to exercise ids.
  * front-plank and hollow-hold are the same moves as the existing ids.
  * lying-toe-touch is the standing toe-touch clip, so it plays on `toe-touch`.
+ * v-sit-hold.gif and floor-l-sit.gif stay on disk and are not shown.
  */
 export const purchaseStemToExerciseId: Record<string, string> = {
   crunch: 'crunch',
@@ -29,7 +30,6 @@ export const purchaseStemToExerciseId: Record<string, string> = {
   'plank-hip-dips': 'plank-hip-dips',
   'push-up-to-side-plank': 'push-up-to-side-plank',
   inchworm: 'inchworm',
-  'floor-l-sit': 'floor-l-sit',
 }
 
 const wiredIds = new Set(Object.values(purchaseStemToExerciseId))

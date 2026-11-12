@@ -12,6 +12,12 @@ export interface WorkoutSettings {
   exerciseSeconds: number
 }
 
+export interface SavedWorkout {
+  id: string
+  name: string
+  exerciseIds: string[]
+}
+
 export const durationOptions = [5, 8, 10, 15, 20] as const
 export const exerciseLengthOptions = [30, 60] as const
 
