@@ -24,3 +24,21 @@ The live site is [petrucci34.github.io/AbWorkouts](https://petrucci34.github.io/
 - **Audio** — none. No sound and no vibration.
 
 Exercise clips are the purchased GIFs from `ab-core-gifs`, renamed to exercise ids in `public/exercises/`. Scissor kicks has no clip, so that move shows a short fallback.
+
+## Checklist
+
+- [ ] Merge the custom workout builder and publish it to GitHub Pages
+- [ ] Remove or replace scissor kicks (no purchased clip; it still shows a fallback)
+- [ ] Review purchased GIFs that already include a FitnessProgramer, FitFocus, or FLABFIX mark and replace any that should not ship
+- [ ] Confirm category tile art stays one black-and-white style
+- [ ] Confirm a saved workout repeats when shorter than the timer and plays once when longer
+- [ ] Confirm floor L-sit and v-sit hold never appear in sessions, favorites, or the builder
+- [x] React app for iPhone and iPad
+- [x] Category tiles start a session with last Settings timing
+- [x] Settings are only 5/8/10/15/20 min and 30s/60s
+- [x] Fixed 3s rest, GIF frozen during rest and pause
+- [x] Elapsed time, up next, previous, end, skip, pause, favorites
+- [x] No sound or haptics
+- [x] Purchased GIFs wired in
+- [x] V-sit hold removed
+- [x] Live site https://petrucci34.github.io/AbWorkouts/
