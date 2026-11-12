@@ -11,7 +11,7 @@ import {
   buildCustomPlan,
   buildFavoritesPlan,
   consumedSeconds,
-  formatDuration,
+  exerciseCounts,
   initialTimerState,
   pauseTimer,
   previousTimer,
@@ -22,18 +22,25 @@ import {
 } from './engine'
 
 describe('workout plans', () => {
-  it('fills the selected duration with work and 3 second rests', () => {
+  it('uses the encoded exercise count for each session length and exercise length', () => {
+    expect(exerciseCounts).toEqual({
+      5: { 30: 10, 60: 5 },
+      8: { 30: 16, 60: 8 },
+      10: { 30: 20, 60: 10 },
+      15: { 30: 30, 60: 15 },
+      20: { 30: 40, 60: 20 },
+    })
     for (const minutes of durationOptions) {
       for (const seconds of exerciseLengthOptions) {
         const settings = { durationMinutes: minutes, exerciseSeconds: seconds }
+        const count = exerciseCounts[minutes][seconds]
         const plan = buildCategoryPlan('upper', settings)
-        const budget = minutes * 60
+        expect(slotCount(settings)).toBe(count)
+        expect(plan.slots).toHaveLength(count)
         expect(plan.restSeconds).toBe(REST_SECONDS)
-        expect(plan.slots.length).toBe(slotCount(settings))
-        expect(plan.totalSeconds).toBe(budget)
-        const durations = plan.slots.map((slot) => slot.durationSeconds)
-        expect(Math.min(...durations)).toBeGreaterThanOrEqual(seconds)
-        expect(Math.max(...durations) - Math.min(...durations)).toBeLessThanOrEqual(1)
+        expect(plan.slots.every((slot) => slot.durationSeconds === seconds)).toBe(true)
+        expect(count * seconds).toBe(minutes * 60)
+        expect(plan.totalSeconds).toBe(count * seconds + (count - 1) * REST_SECONDS)
         expect(plan.slots.every((slot) => slot.exercise.categories.includes('upper'))).toBe(true)
       }
     }
@@ -67,7 +74,7 @@ describe('workout plans', () => {
 
   it('repeats a short custom list and keeps a longer list intact', () => {
     const settings = { durationMinutes: 5, exerciseSeconds: 60 }
-    expect(slotCount(settings)).toBe(4)
+    expect(slotCount(settings)).toBe(5)
     const short = [exercises[0], exercises[1]]
     const repeated = buildCustomPlan(short, settings, ' Morning ')
     expect(repeated.title).toBe('Morning')
@@ -77,8 +84,9 @@ describe('workout plans', () => {
       short[1].id,
       short[0].id,
       short[1].id,
+      short[0].id,
     ])
-    expect(repeated.totalSeconds).toBe(5 * 60)
+    expect(repeated.totalSeconds).toBe(5 * 60 + 4 * REST_SECONDS)
     const longPool = exercises.slice(0, 8)
     const long = buildCustomPlan(longPool, settings, 'Long')
     expect(long.slots.map((slot) => slot.exercise.id)).toEqual(longPool.map((exercise) => exercise.id))
@@ -87,22 +95,6 @@ describe('workout plans', () => {
 })
 
 describe('timer', () => {
-  it('finishes a 10 minute session of 60 second exercises at 10 minutes', () => {
-    const plan = buildCategoryPlan('upper', { durationMinutes: 10, exerciseSeconds: 60 })
-    expect(plan.slots).toHaveLength(9)
-    expect(plan.slots.every((slot) => slot.durationSeconds === 64)).toBe(true)
-    expect(formatDuration(plan.totalSeconds)).toBe('10 min')
-    let state = initialTimerState(plan)
-    for (let second = 0; second < plan.totalSeconds; second += 1) {
-      expect(state.done).toBe(false)
-      state = stepTimer(plan, state)
-    }
-    expect(state.done).toBe(true)
-    expect(plan.totalSeconds).toBe(600)
-    expect(sessionElapsed(state.startedAt, state.startedAt + 600_000)).toBe(600)
-    expect(formatDuration(sessionElapsed(state.startedAt, state.startedAt + 600_000))).toBe('10 min')
-  })
-
   it('counts down a 30 second interval and then finishes a single move', () => {
     const plan = buildCategoryPlan('upper', { durationMinutes: 5, exerciseSeconds: 30 })
     const only = { ...plan, slots: [{ ...plan.slots[0], durationSeconds: 30 }], totalSeconds: 30 }

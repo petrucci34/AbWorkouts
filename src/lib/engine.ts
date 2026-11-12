@@ -1,5 +1,11 @@
 import { exercisesFor } from '../data/exercises'
-import type { Category, Exercise, WorkoutSettings } from '../data/types'
+import {
+  durationOptions,
+  exerciseLengthOptions,
+  type Category,
+  type Exercise,
+  type WorkoutSettings,
+} from '../data/types'
 
 export const REST_SECONDS = 3
 
@@ -33,22 +39,41 @@ export interface TimerState {
   done: boolean
 }
 
-export function slotCount(settings: WorkoutSettings): number {
-  const total = settings.durationMinutes * 60
-  const work = Math.max(settings.exerciseSeconds, 1)
-  const count = Math.floor((total + REST_SECONDS) / (work + REST_SECONDS))
-  return Math.max(1, count)
+type SessionMinutes = (typeof durationOptions)[number]
+type ExerciseLength = (typeof exerciseLengthOptions)[number]
+
+/**
+ * Exercises in a session, listed as 30s then 60s.
+ * The rests sit between those exercises, so the session runs a little past the labeled minutes.
+ */
+export const exerciseCounts: Record<SessionMinutes, Record<ExerciseLength, number>> = {
+  5: { 30: 10, 60: 5 },
+  8: { 30: 16, 60: 8 },
+  10: { 30: 20, 60: 10 },
+  15: { 30: 30, 60: 15 },
+  20: { 30: 40, 60: 20 },
 }
 
-function workDurations(count: number, exerciseSeconds: number, budget: number): number[] {
-  const rests = Math.max(0, count - 1)
-  const durations = Array.from({ length: count }, () => exerciseSeconds)
-  let extra = Math.max(0, budget - (count * exerciseSeconds + rests * REST_SECONDS))
-  for (let index = 0; extra > 0; index += 1) {
-    durations[index % count] += 1
-    extra -= 1
+export function slotCount(settings: WorkoutSettings): number {
+  const minutes = settings.durationMinutes
+  const seconds = settings.exerciseSeconds
+  if (isSessionMinutes(minutes) && isExerciseLength(seconds)) {
+    return exerciseCounts[minutes][seconds]
   }
-  return durations
+  const work = Math.max(seconds, 1)
+  return Math.max(1, Math.round((Math.max(minutes, 0) * 60) / work))
+}
+
+function sessionSeconds(count: number, exerciseSeconds: number): number {
+  return count * exerciseSeconds + Math.max(0, count - 1) * REST_SECONDS
+}
+
+function isSessionMinutes(value: number): value is SessionMinutes {
+  return (durationOptions as readonly number[]).includes(value)
+}
+
+function isExerciseLength(value: number): value is ExerciseLength {
+  return (exerciseLengthOptions as readonly number[]).includes(value)
 }
 
 export function buildPlan(
@@ -62,11 +87,9 @@ export function buildPlan(
   }
 
   const count = slotCount(settings)
-  const budget = settings.durationMinutes * 60
-  const durations = workDurations(count, settings.exerciseSeconds, budget)
-  const slots: WorkoutSlot[] = durations.map((durationSeconds, index) => ({
+  const slots: WorkoutSlot[] = Array.from({ length: count }, (_, index) => ({
     exercise: pool[index % pool.length],
-    durationSeconds,
+    durationSeconds: settings.exerciseSeconds,
   }))
 
   return {
@@ -77,7 +100,7 @@ export function buildPlan(
     settings,
     slots,
     restSeconds: REST_SECONDS,
-    totalSeconds: budget,
+    totalSeconds: sessionSeconds(count, settings.exerciseSeconds),
   }
 }
 
@@ -95,17 +118,11 @@ export function buildCustomPlan(pool: Exercise[], settings: WorkoutSettings, tit
     throw new Error('Cannot build a workout with no exercises')
   }
   const fitted = slotCount(settings)
-  const repeats = pool.length <= fitted
-  const chosen = repeats ? Array.from({ length: fitted }, (_, index) => pool[index % pool.length]) : pool
-  const budget = settings.durationMinutes * 60
-  const durations = repeats
-    ? workDurations(chosen.length, settings.exerciseSeconds, budget)
-    : chosen.map(() => settings.exerciseSeconds)
-  const slots: WorkoutSlot[] = chosen.map((exercise, index) => ({
+  const chosen = pool.length > fitted ? pool : Array.from({ length: fitted }, (_, index) => pool[index % pool.length])
+  const slots: WorkoutSlot[] = chosen.map((exercise) => ({
     exercise,
-    durationSeconds: durations[index],
+    durationSeconds: settings.exerciseSeconds,
   }))
-  const rests = Math.max(0, slots.length - 1)
   const name = title.trim() || 'Custom'
   return {
     id: crypto.randomUUID(),
@@ -115,7 +132,7 @@ export function buildCustomPlan(pool: Exercise[], settings: WorkoutSettings, tit
     settings,
     slots,
     restSeconds: REST_SECONDS,
-    totalSeconds: durations.reduce((sum, duration) => sum + duration, 0) + rests * REST_SECONDS,
+    totalSeconds: sessionSeconds(slots.length, settings.exerciseSeconds),
   }
 }
 
