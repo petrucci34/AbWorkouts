@@ -4,6 +4,7 @@
 # Node
 node_modules/
 dist/
+.vite/
 
 # Numbered purchase drop. Wired copies live in public/exercises.
 ab-core-gifs/
