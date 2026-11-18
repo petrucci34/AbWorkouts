@@ -76,6 +76,17 @@ function isExerciseLength(value: number): value is ExerciseLength {
   return (exerciseLengthOptions as readonly number[]).includes(value)
 }
 
+function shuffle<T>(items: readonly T[]): T[] {
+  const next = items.slice()
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1))
+    const current = next[index]
+    next[index] = next[swap]
+    next[swap] = current
+  }
+  return next
+}
+
 export function buildPlan(
   pool: Exercise[],
   category: Category,
@@ -105,7 +116,7 @@ export function buildPlan(
 }
 
 export function buildCategoryPlan(category: Category, settings: WorkoutSettings): WorkoutPlan {
-  return buildPlan(exercisesFor(category), category, settings)
+  return buildPlan(shuffle(exercisesFor(category)), category, settings)
 }
 
 export function buildFavoritesPlan(pool: Exercise[], settings: WorkoutSettings): WorkoutPlan {
