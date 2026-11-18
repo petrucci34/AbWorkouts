@@ -84,9 +84,12 @@ const chipAfterReload = await page.$eval('.chip', (el) => el.textContent ?? '')
 check('timing persists', chipAfterReload.includes('5 min · 60s'), chipAfterReload)
 
 await page.click('.tile[data-category="upper"]')
-await page.waitForSelector('.demo-image')
+await page.waitForSelector('.workout-copy h2')
+const firstName = await page.$eval('.workout-copy h2', (el) => el.textContent ?? '')
+const firstId = await page.$eval('.gif-frame', (el) => el.getAttribute('data-exercise') ?? '')
+const secondName = await page.$eval('.up-next strong', (el) => el.textContent ?? '')
 const gifSrc = await page.$eval('.demo-image', (el) => el.getAttribute('src') ?? '')
-check('crunch gif', gifSrc.endsWith('/exercises/crunch.gif'), gifSrc)
+check('category gif', firstId.length > 0 && gifSrc.includes(`/exercises/${firstId}.gif`), `${firstId} ${gifSrc}`)
 await page.waitForFunction(() => {
   const img = document.querySelector('.demo-image')
   return img instanceof HTMLImageElement && img.naturalWidth > 0
@@ -94,7 +97,7 @@ await page.waitForFunction(() => {
 const countdown = await page.$eval('.countdown', (el) => el.textContent ?? '')
 check('countdown', countdown.includes('1:00'), countdown)
 const upNext = await page.$eval('.up-next', (el) => el.textContent ?? '')
-check('up next', upNext.includes('Sit-up'), upNext)
+check('up next', secondName.length > 0 && secondName !== firstName && upNext.includes(secondName), upNext)
 check('elapsed', (await page.$eval('.workout-meta', (el) => el.textContent ?? '')).includes('Elapsed'))
 await page.screenshot({ path: `${shots}/03-workout.png` })
 
@@ -121,18 +124,20 @@ await page.waitForFunction(() => document.querySelector('.workout-copy h2')?.tex
 const restClock = await page.$eval('.countdown', (el) => el.textContent ?? '')
 check('rest', restClock.includes('0:03') || restClock.includes('0:02'), restClock)
 const restNext = await page.$eval('.up-next', (el) => el.textContent ?? '')
-check('rest up next', restNext.includes('Sit-up'), restNext)
-await page.waitForFunction(() => {
+check('rest up next', restNext.includes(secondName), restNext)
+await page.waitForFunction((name) => {
   const img = document.querySelector('.demo-image')
   const frame = document.querySelector('.gif-frame')
+  const next = document.querySelector('.up-next')?.textContent ?? ''
   return (
     img instanceof HTMLImageElement &&
     (img.getAttribute('src') ?? '').startsWith('data:image/png') &&
-    frame?.getAttribute('data-exercise') === 'sit-up'
+    next.includes(name) &&
+    (frame?.getAttribute('data-exercise') ?? '').length > 0
   )
-})
+}, {}, secondName)
 const restExercise = await page.$eval('.gif-frame', (el) => el.getAttribute('data-exercise') ?? '')
-check('rest shows next move', restExercise === 'sit-up', restExercise)
+check('rest shows next move', restExercise.length > 0 && restExercise !== firstId, restExercise)
 const restSrc = await page.$eval('.demo-image', (el) => el.getAttribute('src') ?? '')
 const restGifCount = await page.$$eval('.gif-frame img[src$=".gif"]', (els) => els.length)
 await new Promise((resolve) => setTimeout(resolve, 400))
@@ -141,10 +146,10 @@ check('rest is a still', restSrc.startsWith('data:image/png') && restSrc === res
 await page.screenshot({ path: `${shots}/04-rest.png` })
 
 await clickText('Skip')
-await page.waitForFunction(() => document.querySelector('.workout-copy h2')?.textContent === 'Sit-up')
+await page.waitForFunction((name) => document.querySelector('.workout-copy h2')?.textContent === name, {}, secondName)
 await clickText('Previous')
-await page.waitForFunction(() => document.querySelector('.workout-copy h2')?.textContent === 'Crunch')
-check('previous exercise', (await page.$eval('.workout-copy h2', (el) => el.textContent)) === 'Crunch')
+await page.waitForFunction((name) => document.querySelector('.workout-copy h2')?.textContent === name, {}, firstName)
+check('previous exercise', (await page.$eval('.workout-copy h2', (el) => el.textContent)) === firstName)
 
 await clickText('End')
 await page.waitForSelector('.tile')
@@ -152,7 +157,7 @@ check('end returns home', (await page.$eval('h2', (el) => el.textContent)) === '
 await page.waitForSelector('.tile')
 await page.click('[aria-label="Favorites"]')
 await page.waitForSelector('.favorite-name')
-check('favorite saved', (await page.$eval('.favorite-name', (el) => el.textContent)) === 'Crunch')
+check('favorite saved', (await page.$eval('.favorite-name', (el) => el.textContent)) === firstName)
 await page.screenshot({ path: `${shots}/05-favorites.png` })
 await clickText('Start favorites')
 await page.waitForSelector('.topbar-title')
@@ -178,7 +183,18 @@ await page.click('.tile[data-category="obliques"]')
 await page.waitForSelector('.demo-image')
 await page.screenshot({ path: `${shots}/07-workout-ipad.png` })
 const obliqueGif = await page.$eval('.demo-image', (el) => el.getAttribute('src') ?? '')
-check('oblique gif', obliqueGif.includes('bicycle-crunch'), obliqueGif)
+const obliqueId = await page.$eval('.gif-frame', (el) => el.getAttribute('data-exercise') ?? '')
+const obliqueIds = [
+  'bicycle-crunch',
+  'russian-twist',
+  'heel-taps',
+  'oblique-crunch',
+  'side-plank',
+  'windshield-wipers',
+  'plank-hip-dips',
+  'push-up-to-side-plank',
+]
+check('oblique gif', obliqueIds.includes(obliqueId) && obliqueGif.includes(`/exercises/${obliqueId}.gif`), `${obliqueId} ${obliqueGif}`)
 await page.goBack()
 await page.waitForSelector('.tile-grid')
 check('browser back from workout', (await page.$eval('h2', (el) => el.textContent)) === 'Ab Workouts')
@@ -235,7 +251,7 @@ check(
 await page.screenshot({ path: `${shots}/08-bird-dog.png` })
 
 for (const title of ['Jackknife', 'Bear crawl', 'Push-up to side plank']) {
-  for (let step = 0; step < 8; step += 1) {
+  for (let step = 0; step < 30; step += 1) {
     const current = await page.$eval('.workout-copy h2', (el) => el.textContent ?? '')
     if (current === title) break
     await clickText('Skip')
