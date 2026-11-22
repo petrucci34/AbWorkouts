@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { exerciseById } from './data/exercises'
 import type { Category, Exercise, WorkoutSettings } from './data/types'
 import { buildBackup, mergeBackup, type BackupFile } from './lib/backup'
-import { buildCategoryPlan, buildCustomPlan, buildFavoritesPlan, type WorkoutPlan } from './lib/engine'
+import { buildCategoryPlan, buildCustomPlan, buildFavoritesPlan } from './lib/engine'
 import { localDateString, normalizeHistory, type WorkoutLog } from './lib/history'
+import { isNavState, isWorkoutPlan, routeFrom, type NavInput, type NavState, type Route } from './lib/nav'
 import {
   loadCustomWorkouts,
   loadFavorites,
@@ -22,48 +23,6 @@ import { HistoryScreen } from './screens/HistoryScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkoutScreen } from './screens/WorkoutScreen'
-
-type Route =
-  | { name: 'home' }
-  | { name: 'settings' }
-  | { name: 'favorites' }
-  | { name: 'builder' }
-  | { name: 'history' }
-  | { name: 'workout'; plan: WorkoutPlan }
-
-type NavState =
-  | { name: 'home'; depth: number }
-  | { name: 'settings'; depth: number }
-  | { name: 'favorites'; depth: number }
-  | { name: 'builder'; depth: number }
-  | { name: 'history'; depth: number }
-  | { name: 'workout'; depth: number; plan: WorkoutPlan }
-
-type NavInput =
-  | { name: 'home' }
-  | { name: 'settings' }
-  | { name: 'favorites' }
-  | { name: 'builder' }
-  | { name: 'history' }
-  | { name: 'workout'; plan: WorkoutPlan }
-
-function isNavState(value: unknown): value is NavState {
-  if (!value || typeof value !== 'object') return false
-  const name = (value as { name?: unknown }).name
-  return (
-    name === 'home' ||
-    name === 'settings' ||
-    name === 'favorites' ||
-    name === 'builder' ||
-    name === 'history' ||
-    name === 'workout'
-  )
-}
-
-function routeFrom(state: NavState): Route {
-  if (state.name === 'workout') return { name: 'workout', plan: state.plan }
-  return { name: state.name }
-}
 
 export function App() {
   const [settings, setSettings] = useState<WorkoutSettings>(loadSettings)
@@ -220,9 +179,11 @@ export function App() {
     push({ name: 'workout', plan: buildCustomPlan(pool, settings, workout.name) })
   }
 
+  const screen: Route = route.name === 'workout' && !isWorkoutPlan(route.plan) ? { name: 'home' } : route
+
   return (
     <div className="app-shell">
-      {route.name === 'home' && (
+      {screen.name === 'home' && (
         <HomeScreen
           settings={settings}
           favoriteCount={favoriteExercises.length}
@@ -237,7 +198,7 @@ export function App() {
           onDeleteSaved={deleteCustomWorkout}
         />
       )}
-      {route.name === 'settings' && (
+      {screen.name === 'settings' && (
         <SettingsScreen
           settings={settings}
           onChange={changeSettings}
@@ -246,7 +207,7 @@ export function App() {
           onImport={importBackup}
         />
       )}
-      {route.name === 'favorites' && (
+      {screen.name === 'favorites' && (
         <FavoritesScreen
           exercises={favoriteExercises}
           onRemove={toggleFavorite}
@@ -254,12 +215,12 @@ export function App() {
           onBack={back}
         />
       )}
-      {route.name === 'builder' && <BuilderScreen onBack={back} onSave={saveCustomWorkout} />}
-      {route.name === 'history' && <HistoryScreen logs={logs} onDelete={deleteLog} onBack={back} />}
-      {route.name === 'workout' && (
+      {screen.name === 'builder' && <BuilderScreen onBack={back} onSave={saveCustomWorkout} />}
+      {screen.name === 'history' && <HistoryScreen logs={logs} onDelete={deleteLog} onBack={back} />}
+      {screen.name === 'workout' && (
         <WorkoutScreen
-          key={route.plan.id}
-          plan={route.plan}
+          key={screen.plan.id}
+          plan={screen.plan}
           favoriteIds={favoriteIds}
           logs={logs}
           onLog={appendLog}
