@@ -47,7 +47,7 @@ export function WorkoutScreen({
   const shown = state.phase === 'rest' && next ? next.exercise : slot?.exercise
   const starred = shown ? favoriteIds.includes(shown.id) : false
   const progress = plan.totalSeconds === 0 ? 0 : consumedSeconds(plan, state) / plan.totalSeconds
-  const upNext = next ? next.exercise.name : 'Finish'
+  const upNext = next?.exercise?.name ?? 'Finish'
 
   useEffect(() => {
     if (entry) onLog(entry)
