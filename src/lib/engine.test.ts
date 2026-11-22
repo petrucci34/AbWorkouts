@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { catalog, categoryCovers } from '../data/catalog'
 import { exerciseById, exercises, exercisesFor } from '../data/exercises'
 import { categories, durationOptions, exerciseLengthOptions, type Category } from '../data/types'
@@ -46,14 +46,51 @@ describe('workout plans', () => {
     }
   })
 
-  it('cycles the category pool', () => {
-    const settings = { durationMinutes: 8, exerciseSeconds: 60 }
-    const plan = buildCategoryPlan('fullCore', settings)
-    const pool = exercisesFor('fullCore')
-    expect(pool.length).toBeGreaterThan(0)
-    plan.slots.forEach((slot, index) => {
-      expect(slot.exercise.id).toBe(pool[index % pool.length].id)
+  it('cycles a permutation of the category pool', () => {
+    const settings = { durationMinutes: 10, exerciseSeconds: 30 }
+    const pool = exercisesFor('upper').map((exercise) => exercise.id)
+    const plan = buildCategoryPlan('upper', settings)
+    expect(pool.length).toBeGreaterThan(1)
+    expect(plan.slots.length).toBeGreaterThan(pool.length)
+    const ids = plan.slots.map((slot) => slot.exercise.id)
+    const cycle = ids.slice(0, pool.length)
+    expect([...cycle].sort()).toEqual([...pool].sort())
+    ids.forEach((id, index) => {
+      expect(id).toBe(cycle[index % pool.length])
     })
+  })
+
+  it('shuffles a category into a new order on each launch', () => {
+    const settings = { durationMinutes: 10, exerciseSeconds: 30 }
+    const pool = exercisesFor('upper').map((exercise) => exercise.id)
+    expect(pool.length).toBeGreaterThan(1)
+    expect(slotCount(settings)).toBeGreaterThan(pool.length)
+
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+    try {
+      const forced = buildCategoryPlan('upper', settings).slots.map((slot) => slot.exercise.id)
+      expect(random).toHaveBeenCalled()
+      const cycle = forced.slice(0, pool.length)
+      expect(cycle).not.toEqual(pool)
+      expect([...cycle].sort()).toEqual([...pool].sort())
+      forced.forEach((id, index) => {
+        expect(id).toBe(cycle[index % pool.length])
+      })
+    } finally {
+      random.mockRestore()
+    }
+
+    const orders = new Set<string>()
+    for (let launch = 0; launch < 12; launch += 1) {
+      const ids = buildCategoryPlan('upper', settings).slots.map((slot) => slot.exercise.id)
+      const cycle = ids.slice(0, pool.length)
+      expect([...cycle].sort()).toEqual([...pool].sort())
+      ids.forEach((id, index) => {
+        expect(id).toBe(cycle[index % pool.length])
+      })
+      orders.add(cycle.join('|'))
+    }
+    expect(orders.size).toBeGreaterThan(1)
   })
 
   it('gives every category at least one move', () => {
@@ -64,33 +101,43 @@ describe('workout plans', () => {
 
   it('builds a favorites session from the saved moves', () => {
     const pool = [exercises[0], exercises[5]]
-    const plan = buildFavoritesPlan(pool, { durationMinutes: 5, exerciseSeconds: 60 })
-    expect(plan.isFavorites).toBe(true)
-    expect(plan.title).toBe('Favorites')
-    expect(plan.slots[0].exercise.id).toBe(pool[0].id)
-    expect(plan.slots[1].exercise.id).toBe(pool[1].id)
-    expect(plan.slots[2].exercise.id).toBe(pool[0].id)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+    try {
+      const plan = buildFavoritesPlan(pool, { durationMinutes: 5, exerciseSeconds: 60 })
+      expect(plan.isFavorites).toBe(true)
+      expect(plan.title).toBe('Favorites')
+      expect(plan.slots[0].exercise.id).toBe(pool[0].id)
+      expect(plan.slots[1].exercise.id).toBe(pool[1].id)
+      expect(plan.slots[2].exercise.id).toBe(pool[0].id)
+    } finally {
+      random.mockRestore()
+    }
   })
 
   it('repeats a short custom list and keeps a longer list intact', () => {
     const settings = { durationMinutes: 5, exerciseSeconds: 60 }
     expect(slotCount(settings)).toBe(5)
     const short = [exercises[0], exercises[1]]
-    const repeated = buildCustomPlan(short, settings, ' Morning ')
-    expect(repeated.title).toBe('Morning')
-    expect(repeated.restSeconds).toBe(REST_SECONDS)
-    expect(repeated.slots.map((slot) => slot.exercise.id)).toEqual([
-      short[0].id,
-      short[1].id,
-      short[0].id,
-      short[1].id,
-      short[0].id,
-    ])
-    expect(repeated.totalSeconds).toBe(5 * 60 + 4 * REST_SECONDS)
-    const longPool = exercises.slice(0, 8)
-    const long = buildCustomPlan(longPool, settings, 'Long')
-    expect(long.slots.map((slot) => slot.exercise.id)).toEqual(longPool.map((exercise) => exercise.id))
-    expect(long.totalSeconds).toBe(8 * 60 + 7 * REST_SECONDS)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0)
+    try {
+      const repeated = buildCustomPlan(short, settings, ' Morning ')
+      expect(repeated.title).toBe('Morning')
+      expect(repeated.restSeconds).toBe(REST_SECONDS)
+      expect(repeated.slots.map((slot) => slot.exercise.id)).toEqual([
+        short[0].id,
+        short[1].id,
+        short[0].id,
+        short[1].id,
+        short[0].id,
+      ])
+      expect(repeated.totalSeconds).toBe(5 * 60 + 4 * REST_SECONDS)
+      const longPool = exercises.slice(0, 8)
+      const long = buildCustomPlan(longPool, settings, 'Long')
+      expect(long.slots.map((slot) => slot.exercise.id)).toEqual(longPool.map((exercise) => exercise.id))
+      expect(long.totalSeconds).toBe(8 * 60 + 7 * REST_SECONDS)
+    } finally {
+      random.mockRestore()
+    }
   })
 })
 
